@@ -47,6 +47,13 @@
     .card-title { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 800; margin-bottom: 4px; color: #FF7B95; }
     .card-subtitle { font-size: 11px; color: #CBD5E1; margin-bottom: 14px; font-weight: 600; }
     .card-total { font-size: 38px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 16px; line-height: 1; color: #FFFFFF; text-shadow: 0 0 20px rgba(145, 28, 52, 0.3); }
+    
+    /* Restored CSS Classes */
+    .progress-bar { display: flex; border-radius: 8px; overflow: hidden; height: 8px; gap: 2px; background: rgba(0,0,0,0.4); padding: 1px; }
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 24px; }
+    .stat-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 14px; padding: 12px 10px; text-align: center; }
+    .stat-num { font-size: 15px; font-weight: 800; color: #F8FAFC; margin-bottom: 2px; }
+    .stat-lbl { font-size: 9px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.06em; }
 
     .split-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
     .split-card { border-radius: 16px; padding: 16px 18px; backdrop-filter: blur(8px); }
@@ -56,6 +63,7 @@
     .recurring .split-label { color: #4ADE80; }
     .onetime .split-label { color: #FF7B95; }
     .split-value { font-size: 20px; font-weight: 800; color: #FFFFFF; letter-spacing: -0.01em; }
+    .split-desc { font-size: 10px; color: #94A3B8; margin-top: 4px; font-weight: 600; }
 
     details {
       background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07);
@@ -81,6 +89,9 @@
     @keyframes slideDown { 0% { opacity: 0; transform: translateY(-8px); max-height: 0; } 100% { opacity: 1; transform: translateY(0); max-height: 800px; } }
 
     .merchants-list { padding: 10px 18px 16px 18px; border-top: 1px solid rgba(255,255,255,0.06); margin-top: 10px; max-height: 380px; overflow-y: auto; }
+    .merchants-list::-webkit-scrollbar { width: 4px; }
+    .merchants-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
     .merchant-item { font-size: 11.5px; color: #A1A1AA; display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,0.05); }
     .merchant-item:last-child { border-bottom: none; margin-bottom: 0; }
     .m-left { display: flex; align-items: center; gap: 8px; font-weight: 500; }
@@ -88,12 +99,15 @@
     .m-date { font-size: 9.5px; color: #71717A; font-weight: 500; margin-left: 4px; }
     .merchant-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--cat-color); flex-shrink: 0; }
     .m-amt { font-weight: 700; color: #F4F4F5; white-space: nowrap; margin-left: 8px; }
+
+    .footer { text-align: center; margin-top: 28px; font-size: 11px; color: #64748B; font-weight: 600; letter-spacing: 0.04em; }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="header-label">HSBC Statement Parser</div>
-    <div class="header-title">Expense Dashboard</div>
+    <!-- These IDs allow JS to inject the dynamic month/year -->
+    <div class="header-label" id="main-header-label">HSBC Statement Parser</div>
+    <div class="header-title" id="main-header-title">Expense Dashboard</div>
 
     <div class="upload-zone" id="drop-zone">
       <div style="font-size: 40px; margin-bottom: 10px;" id="upload-icon">📄</div>
@@ -105,7 +119,7 @@
       </label>
     </div>
 
-    <div id="dashboard-output" style="display: none; margin-top: 24px;"></div>
+    <div id="dashboard-output" style="display: none; margin-top: 0px;"></div>
   </div>
 
   <script>
@@ -160,21 +174,18 @@
     }
 
     function processTransactions(text) {
-      // Regex looking for HSBC format: Date PostingDate Merchant Amount
-      // Adjusts for spaces and optional CR (Credits)
       const regex = /(\d{2}-[a-zA-Z]{3}-\d{2})\s+(?:\d{2}-[a-zA-Z]{3}-\d{2})?\s+(.*?)\s+(\d{1,3}(?:,\d{3})*\.\d{2})\s*(CR)?/g;
       
       let transactions = [];
       let match;
       
       while ((match = regex.exec(text)) !== null) {
-        if (match[4] === "CR") continue; // Skip payments/credits
+        if (match[4] === "CR") continue; 
         
         const rawDate = match[1];
-        let merchant = match[2].trim().replace(/NFC - \(AP-PAY\)-|IAP - \(AP-PAY\)-/, '').trim(); // Clean HSBC Apple Pay tags
+        let merchant = match[2].trim().replace(/NFC - \(AP-PAY\)-|IAP - \(AP-PAY\)-/, '').trim(); 
         const amount = parseFloat(match[3].replace(',', ''));
         
-        // Exclude balance carryovers or non-merchant lines
         if (merchant.toLowerCase().includes("opening balance") || merchant.toLowerCase().includes("cashback")) continue;
 
         let category = categorize(merchant, amount);
@@ -182,13 +193,23 @@
         
         transactions.push({
           date: formatStandardDate(rawDate),
+          rawDateObj: new Date(formatStandardDate(rawDate)),
           merchant: finalMerchant,
           amount: amount,
           category: category
         });
       }
 
-      renderDashboard(transactions);
+      // Extract statement Month/Year dynamically from the latest transaction
+      let statementMonth = "Current";
+      let statementYear = "Dashboard";
+      if (transactions.length > 0) {
+        let maxDate = new Date(Math.max.apply(null, transactions.map(t => t.rawDateObj)));
+        statementMonth = maxDate.toLocaleString('en-US', { month: 'long' });
+        statementYear = maxDate.getFullYear();
+      }
+
+      renderDashboard(transactions, statementMonth, statementYear);
     }
 
     function categorize(merchant, amount) {
@@ -197,16 +218,16 @@
       if (m.includes("mcdonald") || m.includes("pizza") || m.includes("burger") || m.includes("cafe") || m.includes("zomato") || m.includes("talabat") || m.includes("restaurant") || m.includes("careem food") || m.includes("careem deliveries")) return "Dining & Cafes";
       if (m.includes("enoc") || m.includes("adnoc") || m.includes("eppco")) return "Fuel";
       if (m.includes("belhasa")) return "Services & Driving";
-      if (m.includes("hotel") || m.includes("marriott")) return "Travel & Stays";
-      if (m.includes("marks") || m.includes("noon.com")) return "Shopping";
+      if (m.includes("hotel") || m.includes("marriott") || m.includes("airbnb")) return "Travel & Stays";
+      if (m.includes("marks") || m.includes("noon.com") || m.includes("amazon")) return "Shopping";
       if (m.includes("fedex") || m.includes("courier")) return "Services & Freight";
-      if (m.includes("hair") || m.includes("salon") || m.includes("fiddi")) return "Personal Care";
+      if (m.includes("hair") || m.includes("salon") || m.includes("fiddi") || m.includes("pharmacy")) return "Personal Care";
       if (m.includes("auto") || m.includes("car wash") || m.includes("parking") && !m.includes("digital")) return "Automotive & Tuning";
-      if (m.includes("careem hala") || m.includes("taxi")) return "Transport";
+      if (m.includes("careem hala") || m.includes("taxi") || m.includes("uber")) return "Transport";
       if (m.includes("supermarket") || m.includes("grocery") || m.includes("mart")) return "Groceries";
-      if (m.includes("careem plus") || m.includes("subscription")) return "Subscriptions";
+      if (m.includes("careem plus") || m.includes("subscription") || m.includes("netflix") || m.includes("spotify")) return "Subscriptions";
       
-      return "Shopping"; // Fallback
+      return "Shopping";
     }
 
     function formatMerchant(merchant, amount) {
@@ -220,8 +241,12 @@
       return merchant;
     }
 
-    function renderDashboard(txs) {
+    function renderDashboard(txs, month, year) {
+      // Hide upload zone & dynamically rewrite headers
       document.getElementById('drop-zone').style.display = 'none';
+      document.getElementById('main-header-label').innerText = "HSBC Live+ Statement Analysis";
+      document.getElementById('main-header-title').innerText = `${month} ${year} Dashboard`;
+
       const output = document.getElementById('dashboard-output');
       output.style.display = 'block';
 
@@ -250,23 +275,26 @@
 
       let usualPct = ((usualTotal / totalSpend) * 100).toFixed(1);
       let oneTimePct = ((oneTimeTotal / totalSpend) * 100).toFixed(1);
-      let dailyAvg = Math.round(totalSpend / 30); // Rough estimate
-
-      let html = `
-        <div class="main-card">
-          <div class="card-title">Statement Outflows</div>
-          <div class="card-subtitle">Parsed from PDF</div>
-          <div class="card-total">AED ${totalSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-          <div class="progress-bar">
-      `;
+      
+      // Filter out isolated high spend days to get a better daily average
+      let uniqueDays = [...new Set(txs.map(t => t.date))].length;
+      let dailyAvg = uniqueDays > 0 ? Math.round(totalSpend / uniqueDays) : Math.round(totalSpend / 30);
 
       // Sort categories
       let sortedCats = Object.entries(catData).sort((a, b) => b[1].total - a[1].total);
       
+      let html = `
+        <div class="main-card">
+          <div class="card-title">Statement Outflows</div>
+          <div class="card-subtitle">Parsed automatically from PDF</div>
+          <div class="card-total">AED ${totalSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+          <div class="progress-bar">
+      `;
+
       sortedCats.forEach(([cName, cObj]) => {
         const meta = categoryMeta[cName] || { color: "#A855F7" };
         const pct = ((cObj.total / totalSpend) * 100).toFixed(1);
-        html += `<div style="width: ${pct}%; background: ${meta.color};"></div>`;
+        html += `<div style="width: ${pct}%; background: ${meta.color};" title="${cName}: ${pct}%"></div>`;
       });
       
       html += `</div></div>
@@ -282,11 +310,25 @@
             <div class="split-desc">${oneTimePct}% · ${oneTimeCount} Txs</div>
           </div>
         </div>
+
         <div class="stats-grid">
-          <div class="stat-card"><div class="stat-num">AED ${dailyAvg}</div><div class="stat-lbl">Daily Avg</div></div>
-          <div class="stat-card"><div class="stat-num">${txs.length}</div><div class="stat-lbl">Txn Count</div></div>
-          <div class="stat-card"><div class="stat-num" style="color:#EC4899;">${((sortedCats[0][1].total / totalSpend)*100).toFixed(1)}%</div><div class="stat-lbl">Top: ${sortedCats[0][0].split(' ')[0]}</div></div>
+          <div class="stat-card">
+            <div class="stat-num">AED ${dailyAvg}</div>
+            <div class="stat-lbl">Daily Avg</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num">${txs.length}</div>
+            <div class="stat-lbl">Txn Count</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" style="color: ${sortedCats[0] ? (categoryMeta[sortedCats[0][0]]?.color || '#EC4899') : '#EC4899'};">
+              ${sortedCats[0] ? ((sortedCats[0][1].total / totalSpend)*100).toFixed(1) : 0}%
+            </div>
+            <div class="stat-lbl">Top: ${sortedCats[0] ? sortedCats[0][0].split(' ')[0] : 'N/A'}</div>
+          </div>
         </div>
+
+        <div class="header-label" style="margin-bottom: 12px;">Tap any category to inspect transactions</div>
       `;
 
       sortedCats.forEach(([cName, cObj]) => {
@@ -313,7 +355,7 @@
           </details>`;
       });
 
-      html += `<div class="footer">Dynamic PDF Parse · OLED Dark Charcoal Edition</div>`;
+      html += `<div class="footer">HSBC Live+ · ${month} ${year}</div>`;
       output.innerHTML = html;
     }
   </script>
