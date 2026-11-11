@@ -6,7 +6,7 @@
   <link rel="manifest" href="manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Consolidated Expense Dashboard</title>
+  <title>Expense Dashboard</title>
   
   <!-- PDF.js Library for Local File Parsing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
@@ -48,6 +48,7 @@
     .card-subtitle { font-size: 11px; color: #CBD5E1; margin-bottom: 14px; font-weight: 600; }
     .card-total { font-size: 38px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 16px; line-height: 1; color: #FFFFFF; text-shadow: 0 0 20px rgba(145, 28, 52, 0.3); }
     
+    /* Restored CSS Classes */
     .progress-bar { display: flex; border-radius: 8px; overflow: hidden; height: 8px; gap: 2px; background: rgba(0,0,0,0.4); padding: 1px; }
     .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 24px; }
     .stat-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 14px; padding: 12px 10px; text-align: center; }
@@ -104,17 +105,17 @@
 </head>
 <body>
   <div class="container">
-    <div class="header-label" id="main-header-label">Statements Analysis</div>
+    <!-- These IDs allow JS to inject the dynamic month/year -->
+    <div class="header-label" id="main-header-label">HSBC Statement Parser</div>
     <div class="header-title" id="main-header-title">Expense Dashboard</div>
 
     <div class="upload-zone" id="drop-zone">
-      <div style="font-size: 40px; margin-bottom: 10px;" id="upload-icon">📁</div>
-      <div style="font-weight: 600;" id="upload-text">Upload Credit Card Statements (PDF)</div>
-      <div style="font-size: 12px; color: #94A3B8; margin-top: 8px;">Select multiple PDFs at once for a consolidated view.</div>
+      <div style="font-size: 40px; margin-bottom: 10px;" id="upload-icon">📄</div>
+      <div style="font-weight: 600;" id="upload-text">Upload HSBC Statement (PDF)</div>
+      <div style="font-size: 12px; color: #94A3B8; margin-top: 8px;">Processed securely on your device. No cloud storage.</div>
       <label class="upload-btn">
-        Select PDF File(s)
-        <!-- Note the 'multiple' attribute below -->
-        <input type="file" id="file-input" accept="application/pdf" multiple>
+        Select PDF File
+        <input type="file" id="file-input" accept="application/pdf">
       </label>
     </div>
 
@@ -142,28 +143,28 @@
     const oneTimeCategories = ["Services & Driving", "Travel & Stays", "Services & Freight", "Automotive & Tuning"];
 
     document.getElementById('file-input').addEventListener('change', async function(e) {
-      const files = Array.from(e.target.files);
-      if (files.length === 0) return;
+      const file = e.target.files[0];
+      if (!file) return;
       
       document.getElementById('drop-zone').classList.add('processing');
-      document.getElementById('upload-text').innerText = `Analyzing ${files.length} Statement(s)...`;
+      document.getElementById('upload-text').innerText = "Analyzing Statement...";
       document.getElementById('upload-icon').innerText = "⚙️";
 
-      let combinedRawText = "";
-
-      for (let f = 0; f < files.length; f++) {
-        const file = files[f];
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument(new Uint8Array(arrayBuffer)).promise;
+      const reader = new FileReader();
+      reader.onload = async function() {
+        const typedarray = new Uint8Array(this.result);
+        const pdf = await pdfjsLib.getDocument(typedarray).promise;
         
+        let rawText = "";
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
           const textContent = await page.getTextContent();
-          combinedRawText += textContent.items.map(item => item.str).join(" ") + " ";
+          rawText += textContent.items.map(item => item.str).join(" ") + " ";
         }
-      }
 
-      processTransactions(combinedRawText, files.length);
+        processTransactions(rawText);
+      };
+      reader.readAsArrayBuffer(file);
     });
 
     function formatStandardDate(dateStr) {
@@ -172,21 +173,20 @@
       return `${parts[0].padStart(2, '0')} ${parts[1]} 20${parts[2]}`;
     }
 
-    function processTransactions(text, fileCount) {
-      // Regex pattern supporting standard UAE card statement line items
+    function processTransactions(text) {
       const regex = /(\d{2}-[a-zA-Z]{3}-\d{2})\s+(?:\d{2}-[a-zA-Z]{3}-\d{2})?\s+(.*?)\s+(\d{1,3}(?:,\d{3})*\.\d{2})\s*(CR)?/g;
       
       let transactions = [];
       let match;
       
       while ((match = regex.exec(text)) !== null) {
-        if (match[4] === "CR") continue; // Exclude credits/payments
+        if (match[4] === "CR") continue; 
         
         const rawDate = match[1];
         let merchant = match[2].trim().replace(/NFC - \(AP-PAY\)-|IAP - \(AP-PAY\)-/, '').trim(); 
         const amount = parseFloat(match[3].replace(',', ''));
         
-        if (merchant.toLowerCase().includes("opening balance") || merchant.toLowerCase().includes("cashback") || merchant.toLowerCase().includes("payment received")) continue;
+        if (merchant.toLowerCase().includes("opening balance") || merchant.toLowerCase().includes("cashback")) continue;
 
         let category = categorize(merchant, amount);
         let finalMerchant = formatMerchant(merchant, amount);
@@ -200,21 +200,22 @@
         });
       }
 
-      let statementMonth = "Consolidated";
-      let statementYear = "";
+      // Extract statement Month/Year dynamically from the latest transaction
+      let statementMonth = "Current";
+      let statementYear = "Dashboard";
       if (transactions.length > 0) {
         let maxDate = new Date(Math.max.apply(null, transactions.map(t => t.rawDateObj)));
         statementMonth = maxDate.toLocaleString('en-US', { month: 'long' });
         statementYear = maxDate.getFullYear();
       }
 
-      renderDashboard(transactions, statementMonth, statementYear, fileCount);
+      renderDashboard(transactions, statementMonth, statementYear);
     }
 
     function categorize(merchant, amount) {
       const m = merchant.toLowerCase();
       if (m.includes("digital") || m.includes("smart") || m.includes("authority")) return "Government & Services";
-      if (m.includes("mcdonald") || m.includes("pizza") || m.includes("burger") || m.includes("cafe") || m.includes("zomato") || m.includes("talabat") || m.includes("restaurant") || m.includes("careem food") || m.includes("careem deliveries") || m.includes("knoops") || m.includes("starbucks") || m.includes("tim hortons")) return "Dining & Cafes";
+      if (m.includes("mcdonald") || m.includes("pizza") || m.includes("burger") || m.includes("cafe") || m.includes("zomato") || m.includes("talabat") || m.includes("restaurant") || m.includes("careem food") || m.includes("careem deliveries")) return "Dining & Cafes";
       if (m.includes("enoc") || m.includes("adnoc") || m.includes("eppco")) return "Fuel";
       if (m.includes("belhasa")) return "Services & Driving";
       if (m.includes("hotel") || m.includes("marriott") || m.includes("airbnb")) return "Travel & Stays";
@@ -223,8 +224,8 @@
       if (m.includes("hair") || m.includes("salon") || m.includes("fiddi") || m.includes("pharmacy")) return "Personal Care";
       if (m.includes("auto") || m.includes("car wash") || m.includes("parking") && !m.includes("digital")) return "Automotive & Tuning";
       if (m.includes("careem hala") || m.includes("taxi") || m.includes("uber")) return "Transport";
-      if (m.includes("supermarket") || m.includes("grocery") || m.includes("mart") || m.includes("carrefour") || m.includes("spinneys") || m.includes("lulu")) return "Groceries";
-      if (m.includes("careem plus") || m.includes("subscription") || m.includes("netflix") || m.includes("spotify") || m.includes("apple.com")) return "Subscriptions";
+      if (m.includes("supermarket") || m.includes("grocery") || m.includes("mart")) return "Groceries";
+      if (m.includes("careem plus") || m.includes("subscription") || m.includes("netflix") || m.includes("spotify")) return "Subscriptions";
       
       return "Shopping";
     }
@@ -240,18 +241,17 @@
       return merchant;
     }
 
-    function renderDashboard(txs, month, year, fileCount) {
+    function renderDashboard(txs, month, year) {
+      // Hide upload zone & dynamically rewrite headers
       document.getElementById('drop-zone').style.display = 'none';
-      
-      const headerLabelText = fileCount > 1 ? "Consolidated Cards Statement Analysis" : "Credit Card Statement Analysis";
-      document.getElementById('main-header-label').innerText = headerLabelText;
+      document.getElementById('main-header-label').innerText = "HSBC Live+ Statement Analysis";
       document.getElementById('main-header-title').innerText = `${month} ${year} Dashboard`;
 
       const output = document.getElementById('dashboard-output');
       output.style.display = 'block';
 
       if (txs.length === 0) {
-        output.innerHTML = "<div style='text-align:center;'>No transactions detected across the selected PDFs.</div>";
+        output.innerHTML = "<div style='text-align:center;'>No transactions detected. Ensure the file is an HSBC statement PDF.</div>";
         return;
       }
 
@@ -276,15 +276,17 @@
       let usualPct = ((usualTotal / totalSpend) * 100).toFixed(1);
       let oneTimePct = ((oneTimeTotal / totalSpend) * 100).toFixed(1);
       
+      // Filter out isolated high spend days to get a better daily average
       let uniqueDays = [...new Set(txs.map(t => t.date))].length;
       let dailyAvg = uniqueDays > 0 ? Math.round(totalSpend / uniqueDays) : Math.round(totalSpend / 30);
 
+      // Sort categories
       let sortedCats = Object.entries(catData).sort((a, b) => b[1].total - a[1].total);
       
       let html = `
         <div class="main-card">
-          <div class="card-title">Consolidated Outflows</div>
-          <div class="card-subtitle">Parsed automatically across ${fileCount} PDF statement(s)</div>
+          <div class="card-title">Statement Outflows</div>
+          <div class="card-subtitle">Parsed automatically from PDF</div>
           <div class="card-total">AED ${totalSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
           <div class="progress-bar">
       `;
@@ -353,8 +355,7 @@
           </details>`;
       });
 
-      const footerLabel = fileCount > 1 ? `Consolidated Cards · ${month} ${year}` : `Card Statement · ${month} ${year}`;
-      html += `<div class="footer">${footerLabel}</div>`;
+      html += `<div class="footer">HSBC Live+ · ${month} ${year}</div>`;
       output.innerHTML = html;
     }
   </script>
