@@ -6,12 +6,12 @@
   <link rel="manifest" href="manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Consolidated Expense Dashboard</title>
+  <title>Expense Dashboard</title>
   
   <!-- PDF.js Library for Local File Parsing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
   
-  <style>
+  <style id="dashboard-styles">
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     * { box-sizing: border-box; }
 
@@ -22,6 +22,24 @@
     }
 
     .container { max-width: 620px; margin: 0 auto; }
+
+    /* Top Action Bar */
+    .top-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px; gap: 10px;
+    }
+    .action-btn {
+      background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #F1F5F9; padding: 8px 14px; border-radius: 10px; font-size: 12px;
+      font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+      transition: 0.2s ease; backdrop-filter: blur(8px);
+    }
+    .action-btn:hover { background: rgba(255, 255, 255, 0.12); }
+    .action-btn.save-btn {
+      background: rgba(145, 28, 52, 0.35); border-color: rgba(255, 123, 149, 0.4); color: #FFD1DA;
+    }
+    .action-btn.save-btn:hover { background: rgba(145, 28, 52, 0.55); }
+
     .header-label { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #94A3B8; margin-bottom: 4px; font-weight: 700; }
     .header-title { font-size: 24px; font-weight: 800; color: #FFFFFF; letter-spacing: -0.02em; margin-bottom: 20px; }
 
@@ -93,9 +111,9 @@
 
     .merchant-item { font-size: 11.5px; color: #A1A1AA; display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,0.05); }
     .merchant-item:last-child { border-bottom: none; margin-bottom: 0; }
-    .m-left { display: flex; align-items: center; gap: 8px; font-weight: 500; }
-    .m-name { color: #E4E4E7; font-weight: 600; }
-    .m-date { font-size: 9.5px; color: #71717A; font-weight: 500; margin-left: 4px; }
+    .m-left { display: flex; align-items: center; gap: 8px; font-weight: 500; min-width: 0; }
+    .m-name { color: #E4E4E7; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+    .m-date { font-size: 9.5px; color: #71717A; font-weight: 500; margin-left: 4px; white-space: nowrap; }
     .merchant-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--cat-color); flex-shrink: 0; }
     .m-amt { font-weight: 700; color: #F4F4F5; white-space: nowrap; margin-left: 8px; }
 
@@ -103,14 +121,20 @@
   </style>
 </head>
 <body>
-  <div class="container">
+  <div class="container" id="app-container">
+    <!-- Action Bar (Hidden on Upload Screen) -->
+    <div class="top-bar" id="top-bar" style="display: none;">
+      <button class="action-btn" id="back-btn" type="button">← Back</button>
+      <button class="action-btn save-btn" id="save-btn" type="button">↓ Save HTML</button>
+    </div>
+
     <div class="header-label" id="main-header-label">Statements Analysis</div>
     <div class="header-title" id="main-header-title">Expense Dashboard</div>
 
     <div class="upload-zone" id="drop-zone">
       <div style="font-size: 40px; margin-bottom: 10px;" id="upload-icon">📁</div>
       <div style="font-weight: 600;" id="upload-text">Upload Credit Card Statements (PDF)</div>
-      <div style="font-size: 12px; color: #94A3B8; margin-top: 8px;">Select multiple PDFs at once for a consolidated view.</div>
+      <div style="font-size: 12px; color: #94A3B8; margin-top: 8px;">Select one or multiple PDFs for a single or consolidated dashboard.</div>
       <label class="upload-btn">
         Select PDF File(s)
         <input type="file" id="file-input" accept="application/pdf" multiple>
@@ -121,25 +145,89 @@
   </div>
 
   <script>
+    const APP_VERSION = "v0.9.0";
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
     const categoryMeta = {
       "Dining & Cafes": { icon: "🍽️", color: "#EC4899" },
       "Fuel": { icon: "⛽", color: "#EAB308" },
+      "Education & Professional": { icon: "🎓", color: "#6366F1" },
+      "Automotive & Tuning": { icon: "🚗", color: "#F97316" },
       "Services & Driving": { icon: "🚘", color: "#84CC16" },
       "Government & Services": { icon: "🏛️", color: "#475569" },
       "Travel & Stays": { icon: "✈️", color: "#0EA5E9" },
       "Shopping": { icon: "🛍️", color: "#8B5CF6" },
       "Services & Freight": { icon: "📦", color: "#A855F7" },
       "Personal Care": { icon: "💇", color: "#F43F5E" },
-      "Automotive & Tuning": { icon: "🚗", color: "#F97316" },
+      "Entertainment": { icon: "🎳", color: "#D946EF" },
       "Transport": { icon: "🚕", color: "#22D3EE" },
       "Groceries": { icon: "🛒", color: "#22C55E" },
       "Subscriptions": { icon: "📱", color: "#64748B" }
     };
 
-    const oneTimeCategories = ["Services & Driving", "Travel & Stays", "Services & Freight", "Automotive & Tuning"];
+    const oneTimeCategories = [
+      "Education & Professional",
+      "Services & Driving",
+      "Travel & Stays",
+      "Services & Freight",
+      "Automotive & Tuning"
+    ];
 
+    let currentExportFilename = "Expense_Dashboard.html";
+
+    // Back Button Handler
+    document.getElementById('back-btn').addEventListener('click', function() {
+      document.getElementById('dashboard-output').style.display = 'none';
+      document.getElementById('dashboard-output').innerHTML = '';
+      document.getElementById('top-bar').style.display = 'none';
+      
+      const dropZone = document.getElementById('drop-zone');
+      dropZone.style.display = 'block';
+      dropZone.classList.remove('processing');
+      document.getElementById('upload-icon').innerText = '📁';
+      document.getElementById('upload-text').innerText = 'Upload Credit Card Statements (PDF)';
+      document.getElementById('file-input').value = '';
+
+      document.getElementById('main-header-label').innerText = 'Statements Analysis';
+      document.getElementById('main-header-title').innerText = 'Expense Dashboard';
+    });
+
+    // Save HTML Button Handler
+    document.getElementById('save-btn').addEventListener('click', function() {
+      const styles = document.getElementById('dashboard-styles').innerHTML;
+      const headerLabel = document.getElementById('main-header-label').innerText;
+      const headerTitle = document.getElementById('main-header-title').innerText;
+      const dashboardHtml = document.getElementById('dashboard-output').innerHTML;
+
+      const standaloneHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${headerTitle} - ${headerLabel}</title>
+  <style>${styles}</style>
+</head>
+<body>
+  <div class="container">
+    <div class="header-label">${headerLabel}</div>
+    <div class="header-title">${headerTitle}</div>
+    <div>${dashboardHtml}</div>
+  </div>
+</body>
+</html>`;
+
+      const blob = new Blob([standaloneHtml], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = currentExportFilename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+
+    // File Upload Handler
     document.getElementById('file-input').addEventListener('change', async function(e) {
       const files = Array.from(e.target.files);
       if (files.length === 0) return;
@@ -148,170 +236,268 @@
       document.getElementById('upload-text').innerText = `Analyzing ${files.length} Statement(s)...`;
       document.getElementById('upload-icon').innerText = "⚙️";
 
-      let combinedRawText = "";
+      let allTransactions = [];
+      let detectedCards = new Set();
+      let detectedPeriodEnd = null;
 
       for (let f = 0; f < files.length; f++) {
         const file = files[f];
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument(new Uint8Array(arrayBuffer)).promise;
         
+        // Extract Card Name & Statement Period from Page 1
+        const page1 = await pdf.getPage(1);
+        const page1Content = await page1.getTextContent();
+        const page1Text = page1Content.items.map(i => i.str).join(" ");
+
+        const cardName = extractCardName(page1Text);
+        if (cardName) detectedCards.add(cardName);
+
+        const periodEnd = extractStatementPeriodEnd(page1Text);
+        if (periodEnd && (!detectedPeriodEnd || periodEnd > detectedPeriodEnd)) {
+          detectedPeriodEnd = periodEnd;
+        }
+
+        // Reconstruct visual lines using (x, y) coordinates across all pages
+        let pageLines = [];
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          combinedRawText += textContent.items.map(item => item.str).join(" ") + " ";
-        }
-      }
-
-      processTransactions(combinedRawText, files.length);
-    });
-
-    function formatStandardDate(dateStr) {
-      const parts = dateStr.split('-');
-      if(parts.length !== 3) return dateStr;
-      return `${parts[0].padStart(2, '0')} ${parts[1]} 20${parts[2]}`;
-    }
-
-    function processTransactions(text, fileCount) {
-      // 1. Normalize spaces completely to prevent PDF line-break artifacts
-      text = text.replace(/\s+/g, ' ');
-
-      // 2. Split strictly by Date (e.g., 10-Oct-26) to isolate every single transaction block
-      const dateRegex = /(\d{2}-[a-zA-Z]{3}-\d{2})/g;
-      const parts = text.split(dateRegex);
-      
-      let transactions = [];
-      let currentDate = null;
-
-      // parts[1] is the first date, parts[2] is the text after it, etc.
-      for (let i = 1; i < parts.length; i += 2) {
-        let dateStr = parts[i];
-        let block = parts[i+1] ? parts[i+1].trim() : '';
-
-        // Handle double-dates (Transaction Date immediately followed by Posting Date)
-        if (block.length < 2) {
-          if (!currentDate) currentDate = dateStr;
-          continue;
+          const lines = await extractVisualLines(page);
+          pageLines.push(...lines);
         }
 
-        if (!currentDate) currentDate = dateStr;
-
-        let lowerBlock = block.toLowerCase();
-        if (lowerBlock.includes("opening balance") || 
-            lowerBlock.includes("closing balance") ||
-            lowerBlock.includes("total amount due")) {
-          currentDate = null;
-          continue;
-        }
-
-        // Extract ALL numbers that look like currency (e.g. 1,234.56 or 45.00)
-        const amounts = block.match(/[\d,]+\.\d{2}/g);
-        if (!amounts) {
-          currentDate = null;
-          continue;
-        }
-
-        // The final AED billed amount is ALWAYS the last decimal in the text block
-        let amountStr = amounts[amounts.length - 1];
-        
-        // Exclude payments/credits: Check if the letters 'CR' appear AFTER the final AED amount
-        let afterAmount = block.substring(block.lastIndexOf(amountStr) + amountStr.length);
-        if (/\bCR\b/i.test(afterAmount)) {
-          currentDate = null;
-          continue; 
-        }
-
-        let amount = parseFloat(amountStr.replace(/,/g, ''));
-
-        // The merchant string is everything from the start of the block up to the final AED amount
-        let merchant = block.substring(0, block.lastIndexOf(amountStr)).trim();
-
-        // Clean up Apple Pay tags
-        merchant = merchant.replace(/NFC\s*-\s*\(AP-PAY\)-|IAP\s*-\s*\(AP-PAY\)-/ig, '').trim();
-
-        // Strip trailing Foreign Currency details (e.g., " 15.00 GBP 5.03")
-        // Removes any trailing chunk that starts with a decimal, has a 3-letter currency code, and extra FX rates
-        merchant = merchant.replace(/\s+[\d,]+\.\d{2}\s*[a-zA-Z]{3}.*$/i, '').trim();
-        
-        // Clean up trailing hyphens or spaces
-        merchant = merchant.replace(/[-\s]+$/, ''); 
-
-        if (merchant.length > 0) {
-          transactions.push({
-            date: formatStandardDate(currentDate),
-            rawDateObj: new Date(formatStandardDate(currentDate)),
-            merchant: formatMerchant(merchant, amount),
-            amount: amount,
-            category: categorize(merchant, amount)
-          });
-        }
-
-        currentDate = null;
+        const fileTxs = parseTransactionsFromLines(pageLines, cardName || "Credit Card");
+        allTransactions.push(...fileTxs);
       }
 
       let statementMonth = "Consolidated";
       let statementYear = "";
-      if (transactions.length > 0) {
-        let maxDate = new Date(Math.max.apply(null, transactions.map(t => t.rawDateObj)));
+      if (detectedPeriodEnd) {
+        statementMonth = detectedPeriodEnd.toLocaleString('en-US', { month: 'long' });
+        statementYear = detectedPeriodEnd.getFullYear();
+      } else if (allTransactions.length > 0) {
+        let maxDate = new Date(Math.max.apply(null, allTransactions.map(t => t.rawDateObj)));
         statementMonth = maxDate.toLocaleString('en-US', { month: 'long' });
         statementYear = maxDate.getFullYear();
       }
 
-      renderDashboard(transactions, statementMonth, statementYear, fileCount);
+      renderDashboard(allTransactions, statementMonth, statementYear, files.length, Array.from(detectedCards));
+    });
+
+    function extractCardName(page1Text) {
+      // Match HSBC Card Name (e.g., "HSBC Live+ Credit Card Statement" -> "HSBC Live+ Card")
+      const hsbcMatch = page1Text.match(/HSBC\s+([A-Za-z0-9+\s]+?)\s+Credit\s+Card/i);
+      if (hsbcMatch && hsbcMatch[1]) {
+        const variant = hsbcMatch[1].trim().replace(/\s+/g, ' ');
+        if (!variant.toLowerCase().includes("bank")) {
+          return `HSBC ${variant} Card`;
+        }
+      }
+      // Match other UAE banks if uploaded later
+      if (/CBD\s+Super\s+Saver/i.test(page1Text)) return "CBD Super Saver Card";
+      if (/Emirates\s+NBD/i.test(page1Text)) return "Emirates NBD Card";
+      if (/Citibank/i.test(page1Text)) return "Citibank Card";
+      if (/HSBC/i.test(page1Text)) return "HSBC Card";
+      return "Credit Card";
     }
 
-   function categorize(merchant, amount) {
-      const m = merchant.toLowerCase();
-      
-      // Government & Dubai Smart Services
-      if (m.includes("digital") || m.includes("smart") || m.includes("authority")) return "Government & Services";
-      
-      // Dining & Cafes (Expanded Dictionary)
-      if (m.includes("mcdonald") || m.includes("pizza") || m.includes("burger") || 
-          m.includes("cafe") || m.includes("zomato") || m.includes("talabat") || 
-          m.includes("restaurant") || m.includes("careem food") || m.includes("careem deliveries") || 
-          m.includes("knoops") || m.includes("starbucks") || m.includes("tim hortons") ||
-          m.includes("qlub") || m.includes("bakery") || m.includes("ice cream") ||
-          m.includes("alshaya") || m.includes("changs") || m.includes("lazy cat") ||
-          m.includes("grillo") || m.includes("brioche") || m.includes("cheese cake") ||
-          m.includes("lounge") || m.includes("culinary")) return "Dining & Cafes";
-          
-      // Fuel
-      if (m.includes("enoc") || m.includes("adnoc") || m.includes("eppco")) return "Fuel";
-      
-      // Services & Driving
-      if (m.includes("belhasa")) return "Services & Driving";
-      
-      // Travel & Stays
-      if (m.includes("hotel") || m.includes("marriott") || m.includes("airbnb")) return "Travel & Stays";
-      
-      // Shopping
-      if (m.includes("marks") || m.includes("noon.com") || m.includes("amazon")) return "Shopping";
-      
-      // Services & Freight
-      if (m.includes("fedex") || m.includes("courier") || m.includes("master key")) return "Services & Freight";
-      
-      // Personal Care
-      if (m.includes("hair") || m.includes("salon") || m.includes("fiddi") || m.includes("pharmacy")) return "Personal Care";
-      
-      // Automotive & Tuning
-      if (m.includes("auto") || m.includes("car wash") || (m.includes("parking") && !m.includes("digital"))) return "Automotive & Tuning";
-      
-      // Transport
-      if (m.includes("careem hala") || m.includes("taxi") || m.includes("uber")) return "Transport";
-      
-      // Groceries
-      if (m.includes("supermarket") || m.includes("grocery") || m.includes("mart") || m.includes("carrefour") || m.includes("spinneys") || m.includes("lulu")) return "Groceries";
-      
-      // Subscriptions
-      if (m.includes("careem plus") || m.includes("subscription") || m.includes("netflix") || m.includes("spotify") || m.includes("apple.com")) return "Subscriptions";
-      
-      // Default Fallback
-      return "Shopping";
+    function extractStatementPeriodEnd(page1Text) {
+      // Match "Statement Period: From 11 September 26 to 11 October 26"
+      const match = page1Text.match(/Statement\s+Period:\s*From\s+\d{1,2}\s+[A-Za-z]+\s+\d{2,4}\s+to\s+(\d{1,2})\s+([A-Za-z]+)\s+(\d{2,4})/i);
+      if (match) {
+        const day = match[1].padStart(2, '0');
+        const month = match[2];
+        const year = match[3].length === 2 ? `20${match[3]}` : match[3];
+        const d = new Date(`${day} ${month} ${year}`);
+        if (!isNaN(d.getTime())) return d;
+      }
+      return null;
+    }
+
+    // Reconstruct visual rows from PDF.js (x, y) coordinates so stacked table rows never merge
+    async function extractVisualLines(page) {
+      const textContent = await page.getTextContent();
+      const items = textContent.items.filter(item => item.str && item.str.trim().length > 0);
+
+      // Sort top-to-bottom (Y descending), then left-to-right (X ascending)
+      items.sort((a, b) => {
+        const yDiff = b.transform[5] - a.transform[5];
+        if (Math.abs(yDiff) > 3.5) return yDiff;
+        return a.transform[4] - b.transform[4];
+      });
+
+      const lines = [];
+      let currentLine = [];
+      let currentY = null;
+
+      for (const item of items) {
+        const x = item.transform[4];
+        const y = item.transform[5];
+        if (currentY === null || Math.abs(y - currentY) <= 3.5) {
+          currentLine.push({ str: item.str.trim(), x, y });
+          if (currentY === null) currentY = y;
+        } else {
+          currentLine.sort((a, b) => a.x - b.x);
+          lines.push(currentLine);
+          currentLine = [{ str: item.str.trim(), x, y }];
+          currentY = y;
+        }
+      }
+      if (currentLine.length > 0) {
+        currentLine.sort((a, b) => a.x - b.x);
+        lines.push(currentLine);
+      }
+      return lines;
+    }
+
+    function formatStandardDate(rawDate) {
+      // Clean HSBC typos like "28-Oct26-" -> "28-Oct-26"
+      const cleaned = rawDate.replace(/^-|-$/g, '');
+      const m = cleaned.match(/^(\d{1,2})-([a-zA-Z]{3,4})-?(\d{2})$/);
+      if (!m) return cleaned;
+      const day = m[1].padStart(2, '0');
+      let mon = m[2];
+      // Normalize 4-letter "Sept" to "Sep" for standard JS Date parsing & clean display
+      if (mon.toLowerCase() === 'sept') mon = 'Sep';
+      return `${day} ${mon} 20${m[3]}`;
+    }
+
+    function parseTransactionsFromLines(lines, cardName) {
+      // Matches DD-MMM-YY or DD-Sept-YY (and typos like 28-Oct26-)
+      const dateTokenRegex = /^(\d{1,2}-[a-zA-Z]{3,4}-?\d{2}-?)$/;
+      const amountTokenRegex = /^[\d,]+\.\d{2}(?:\s*CR)?$/i;
+
+      let transactions = [];
+      let currentTx = null;
+
+      function finalizeCurrentTx() {
+        if (!currentTx) return;
+
+        const fullDetail = currentTx.detailParts.join(" ").replace(/\s+/g, " ").trim();
+        const lowerDetail = fullDetail.toLowerCase();
+
+        // Skip non-purchase / credit / header rows
+        if (currentTx.isCredit ||
+            lowerDetail.includes("opening balance") ||
+            lowerDetail.includes("closing balance") ||
+            lowerDetail.includes("total amount due") ||
+            lowerDetail.includes("cashback") ||
+            lowerDetail.includes("issuer dcc credit")) {
+          currentTx = null;
+          return;
+        }
+
+        // Determine final AED amount: prefer rightmost column (x > 500), fallback to last decimal in row
+        let amount = null;
+        if (currentTx.rightmostAmounts.length > 0) {
+          amount = currentTx.rightmostAmounts[currentTx.rightmostAmounts.length - 1];
+        } else if (currentTx.fallbackAmounts.length > 0) {
+          amount = currentTx.fallbackAmounts[currentTx.fallbackAmounts.length - 1];
+        }
+
+        if (amount !== null && amount > 0 && fullDetail.length > 0) {
+          const cleanName = cleanMerchantName(fullDetail);
+          if (cleanName.length > 0) {
+            const stdDate = formatStandardDate(currentTx.date);
+            transactions.push({
+              date: stdDate,
+              rawDateObj: new Date(stdDate),
+              merchant: formatMerchant(cleanName, amount),
+              amount: amount,
+              category: categorize(cleanName, amount),
+              card: cardName
+            });
+          }
+        }
+        currentTx = null;
+      }
+
+      for (const line of lines) {
+        if (line.length === 0) continue;
+
+        // Check if this line starts with a Transaction Date in the left column (x < 115)
+        const firstToken = line[0];
+        const isNewTxStart = firstToken.x < 115 && dateTokenRegex.test(firstToken.str);
+
+        if (isNewTxStart) {
+          finalizeCurrentTx();
+          currentTx = {
+            date: firstToken.str,
+            detailParts: [],
+            rightmostAmounts: [],
+            fallbackAmounts: [],
+            isCredit: false
+          };
+        }
+
+        if (!currentTx) continue;
+
+        // Stop collecting if we hit page footers / legal disclaimers / glossary
+        const lineText = line.map(t => t.str).join(" ");
+        if (/^Page \d+ of \d+/i.test(lineText) ||
+            lineText.includes("Glossary/Definitions") ||
+            lineText.includes("Enjoy complimentary 12-month") ||
+            lineText.includes("Get a complimentary 12-month Careem Plus")) {
+          finalizeCurrentTx();
+          continue;
+        }
+
+        for (let idx = 0; idx < line.length; idx++) {
+          const token = line[idx];
+          // Skip the Transaction Date token itself
+          if (isNewTxStart && idx === 0) continue;
+
+          // Skip Posting Date tokens (located in x < 160)
+          if (token.x < 160 && dateTokenRegex.test(token.str)) continue;
+
+          // Check for CR (Credits/Refunds/Payments)
+          if (/^CR$/i.test(token.str) || /\d+\.\d{2}\s*CR$/i.test(token.str)) {
+            currentTx.isCredit = true;
+          }
+
+          // Collect amounts by X-column position
+          if (token.x >= 380) {
+            const numMatch = token.str.match(/([\d,]+\.\d{2})/);
+            if (numMatch) {
+              const val = parseFloat(numMatch[1].replace(/,/g, ''));
+              if (token.x >= 500) {
+                currentTx.rightmostAmounts.push(val);
+              } else {
+                currentTx.fallbackAmounts.push(val);
+              }
+            }
+          } else if (token.x >= 150 && token.x < 380) {
+            // Transaction Details column only (excludes Original Amount & VAT columns!)
+            if (!amountTokenRegex.test(token.str)) {
+              currentTx.detailParts.push(token.str);
+            }
+          }
+        }
+      }
+
+      finalizeCurrentTx();
+      return transactions;
+    }
+
+    function cleanMerchantName(raw) {
+      let m = raw;
+      // Remove Apple Pay prefixes
+      m = m.replace(/\b(?:NFC|IAP)\s*-\s*\(AP-PAY\)-/ig, '');
+      // Remove HSBC FX / fee boilerplate lines
+      m = m.replace(/FOREIGN CURRENCY PROCESSING FEE/ig, '');
+      m = m.replace(/STND PROC\. FEE \(AS PER SCHEMES\)/ig, '');
+      m = m.replace(/STND PROC\. FEE FOR DCC TRNX/ig, '');
+      m = m.replace(/ISSUER DCC DEBIT TRANSACTION/ig, '');
+      m = m.replace(/\b[A-Z]{3}\/AED\b/ig, '');
+      m = m.replace(/\b\d{6,}\b/g, ''); // Remove FX reference IDs like 272234905
+      // Clean up extra whitespace and trailing hyphens
+      m = m.replace(/\s+/g, ' ').replace(/^[-\s]+|[-\s]+$/g, '').trim();
+      return m;
     }
 
     function formatMerchant(merchant, amount) {
       const m = merchant.toLowerCase();
-      if (m.includes("digital") || m.includes("smart") || m.includes("authority")) {
+      if (m.includes("digital dubai") || m.includes("dubai digital") || m.includes("smart dubai")) {
         if ([50, 75, 100, 120].includes(amount)) return "Digital Dubai (Salik Recharge)";
         if (amount === 220) return "Dubai Digital Authority (Govt Fee)";
         if (amount % 1 !== 0) return "Digital Dubai (Parkin Payment)";
@@ -320,18 +506,124 @@
       return merchant;
     }
 
-    function renderDashboard(txs, month, year, fileCount) {
+    function categorize(merchant, amount) {
+      const m = merchant.toLowerCase();
+
+      // 1. Education & Professional
+      if (m.includes("cfa institute") || m.includes("university") || m.includes("college") || 
+          m.includes("academy") || m.includes("coursera") || m.includes("udemy") || 
+          m.includes("pearson") || m.includes("prometric")) {
+        return "Education & Professional";
+      }
+
+      // 2. Government & Dubai Smart Services
+      if (m.includes("digital dubai") || m.includes("dubai digital") || m.includes("smart dubai") || 
+          m.includes("authority") || m.includes("salik") || m.includes("tasheel") || m.includes("amer")) {
+        return "Government & Services";
+      }
+
+      // 3. Fuel
+      if (m.includes("enoc") || m.includes("adnoc") || m.includes("eppco") || m.includes("emarat") || m.includes("cafu")) {
+        return "Fuel";
+      }
+
+      // 4. Services & Driving
+      if (m.includes("belhasa") || m.includes("driving center") || m.includes("emirates driving")) {
+        return "Services & Driving";
+      }
+
+      // 5. Automotive & Tuning
+      if (m.includes("z1 motorsports") || m.includes("motorsport") || m.includes("shanghai global auto") || 
+          m.includes("autocare") || m.includes("auto care") || m.includes("car wash") || 
+          m.includes("garage") || m.includes("tyre") || (m.includes("parking") && !m.includes("digital"))) {
+        return "Automotive & Tuning";
+      }
+
+      // 6. Dining & Cafes
+      if (m.includes("fresh bakes") || m.includes("coffee") || m.includes("cafe") || m.includes("cafeteri") ||
+          m.includes("restaurant") || m.includes("restaura") || m.includes("mcdonald") || m.includes("pizza") ||
+          m.includes("burger") || m.includes("zomato") || m.includes("talabat") || m.includes("careem food") ||
+          m.includes("careem deliveries") || m.includes("keeta") || m.includes("deliveroo") ||
+          m.includes("knoops") || m.includes("starbucks") || m.includes("tim hortons") || m.includes("qlub") ||
+          m.includes("bakery") || m.includes("ice cream") || m.includes("freez") || m.includes("alshaya") ||
+          m.includes("changs") || m.includes("lazy cat") || m.includes("grillo") || m.includes("brioche") ||
+          m.includes("cheese cake") || m.includes("cheesecake") || m.includes("lounge") || m.includes("culinary") ||
+          m.includes("cookie dealer") || m.includes("fusion") || m.includes("bebax") || m.includes("chefs") ||
+          m.includes("daves hot chicken") || m.includes("koukh al shay") || m.includes("kfc") || m.includes("subway")) {
+        return "Dining & Cafes";
+      }
+
+      // 7. Entertainment
+      if (m.includes("tiger strikes") || m.includes("billiards") || m.includes("bowling") || 
+          m.includes("que club") || m.includes("cinema") || m.includes("vox") || m.includes("roxy") || 
+          m.includes("reel") || m.includes("topgolf")) {
+        return "Entertainment";
+      }
+
+      // 8. Travel & Stays
+      if (m.includes("hotel") || m.includes("marriott") || m.includes("hilton") || m.includes("hyatt") ||
+          m.includes("airbnb") || m.includes("booking.com") || m.includes("agoda") || m.includes("emirates") ||
+          m.includes("flydubai") || m.includes("etihad") || m.includes("swiss") || m.includes("norwegian")) {
+        return "Travel & Stays";
+      }
+
+      // 9. Transport
+      if (m.includes("careem hala") || m.includes("taxi") || m.includes("uber") || 
+          m.includes("dubai metro") || m.includes("rta-dubai metro")) {
+        return "Transport";
+      }
+
+      // 10. Groceries
+      if (m.includes("supermarket") || m.includes("grocery") || m.includes("carrefour") || 
+          m.includes("spinneys") || m.includes("lulu") || m.includes("choithrams") || m.includes("waitrose") ||
+          m.includes("fresh day") || m.includes("zahra al lotus")) {
+        return "Groceries";
+      }
+
+      // 11. Personal Care
+      if (m.includes("alrabbash") || m.includes("fiddi") || m.includes("hair") || m.includes("salon") || 
+          m.includes("barber") || m.includes("pharmacy") || m.includes("aster") || m.includes("life pharmacy") ||
+          m.includes("ibrahem al qurashi") || m.includes("sephora")) {
+        return "Personal Care";
+      }
+
+      // 12. Services & Freight
+      if (m.includes("fedex") || m.includes("dhl") || m.includes("aramex") || m.includes("ups") || 
+          m.includes("courier") || m.includes("master key")) {
+        return "Services & Freight";
+      }
+
+      // 13. Subscriptions
+      if (m.includes("careem plus") || m.includes("subscription") || m.includes("netflix") || 
+          m.includes("spotify") || m.includes("apple.com") || m.includes("gymnation") || m.includes("icloud")) {
+        return "Subscriptions";
+      }
+
+      // 14. Shopping (Default Fallback)
+      return "Shopping";
+    }
+
+    function renderDashboard(txs, month, year, fileCount, cardNames) {
       document.getElementById('drop-zone').style.display = 'none';
+      document.getElementById('top-bar').style.display = 'flex';
       
-      const headerLabelText = fileCount > 1 ? "Consolidated Cards Statement Analysis" : "Credit Card Statement Analysis";
+      const cardsTitle = cardNames.length > 0 ? cardNames.join(" & ") : "Credit Card";
+      const headerLabelText = fileCount > 1 
+        ? `${cardsTitle} · Consolidated Analysis` 
+        : `${cardsTitle} · Statement Analysis`;
+        
       document.getElementById('main-header-label').innerText = headerLabelText;
       document.getElementById('main-header-title').innerText = `${month} ${year} Dashboard`;
+
+      // Prepare clean filename for Save HTML export
+      const safeCards = cardsTitle.replace(/[^a-zA-Z0-9]+/g, '_');
+      currentExportFilename = `${safeCards}_${month}_${year}_Dashboard.html`;
 
       const output = document.getElementById('dashboard-output');
       output.style.display = 'block';
 
       if (txs.length === 0) {
-        output.innerHTML = "<div style='text-align:center;'>No transactions detected across the selected PDFs.</div>";
+        output.innerHTML = "<div style='text-align:center; padding: 30px 0; color: #94A3B8;'>No transactions detected across the selected PDF(s).</div>";
         return;
       }
 
@@ -361,10 +653,15 @@
 
       let sortedCats = Object.entries(catData).sort((a, b) => b[1].total - a[1].total);
       
+      const cardBoxTitle = fileCount > 1 ? "Consolidated Outflows" : "Statement Outflows";
+      const cardBoxSub = fileCount > 1 
+        ? `Parsed across ${fileCount} statements (${cardsTitle})` 
+        : `${cardsTitle} · Parsed from PDF`;
+
       let html = `
         <div class="main-card">
-          <div class="card-title">Consolidated Outflows</div>
-          <div class="card-subtitle">Parsed automatically across ${fileCount} PDF statement(s)</div>
+          <div class="card-title">${cardBoxTitle}</div>
+          <div class="card-subtitle">${cardBoxSub}</div>
           <div class="card-total">AED ${totalSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
           <div class="progress-bar">
       `;
@@ -415,9 +712,10 @@
         
         let itemsHtml = "";
         cObj.items.sort((a, b) => b.amount - a.amount).forEach(item => {
+          const cardTag = fileCount > 1 ? ` · ${item.card.replace(' Card', '')}` : '';
           itemsHtml += `
             <div class="merchant-item">
-              <div class="m-left"><div class="merchant-dot"></div><span class="m-name">${item.merchant}</span><span class="m-date">${item.date}</span></div>
+              <div class="m-left"><div class="merchant-dot"></div><span class="m-name">${item.merchant}</span><span class="m-date">${item.date}${cardTag}</span></div>
               <div class="m-amt">AED ${item.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
             </div>`;
         });
@@ -433,8 +731,7 @@
           </details>`;
       });
 
-      const footerLabel = fileCount > 1 ? `Consolidated Cards · ${month} ${year}` : `Card Statement · ${month} ${year}`;
-      html += `<div class="footer">${footerLabel}</div>`;
+      html += `<div class="footer">${cardsTitle} · ${month} ${year} · ${APP_VERSION}</div>`;
       output.innerHTML = html;
     }
   </script>
