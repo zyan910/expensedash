@@ -259,21 +259,53 @@
       renderDashboard(transactions, statementMonth, statementYear, fileCount);
     }
 
-    function categorize(merchant, amount) {
+   function categorize(merchant, amount) {
       const m = merchant.toLowerCase();
+      
+      // Government & Dubai Smart Services
       if (m.includes("digital") || m.includes("smart") || m.includes("authority")) return "Government & Services";
-      if (m.includes("mcdonald") || m.includes("pizza") || m.includes("burger") || m.includes("cafe") || m.includes("zomato") || m.includes("talabat") || m.includes("restaurant") || m.includes("careem food") || m.includes("careem deliveries") || m.includes("knoops") || m.includes("starbucks") || m.includes("tim hortons")) return "Dining & Cafes";
+      
+      // Dining & Cafes (Expanded Dictionary)
+      if (m.includes("mcdonald") || m.includes("pizza") || m.includes("burger") || 
+          m.includes("cafe") || m.includes("zomato") || m.includes("talabat") || 
+          m.includes("restaurant") || m.includes("careem food") || m.includes("careem deliveries") || 
+          m.includes("knoops") || m.includes("starbucks") || m.includes("tim hortons") ||
+          m.includes("qlub") || m.includes("bakery") || m.includes("ice cream") ||
+          m.includes("alshaya") || m.includes("changs") || m.includes("lazy cat") ||
+          m.includes("grillo") || m.includes("brioche") || m.includes("cheese cake") ||
+          m.includes("lounge") || m.includes("culinary")) return "Dining & Cafes";
+          
+      // Fuel
       if (m.includes("enoc") || m.includes("adnoc") || m.includes("eppco")) return "Fuel";
+      
+      // Services & Driving
       if (m.includes("belhasa")) return "Services & Driving";
+      
+      // Travel & Stays
       if (m.includes("hotel") || m.includes("marriott") || m.includes("airbnb")) return "Travel & Stays";
+      
+      // Shopping
       if (m.includes("marks") || m.includes("noon.com") || m.includes("amazon")) return "Shopping";
-      if (m.includes("fedex") || m.includes("courier")) return "Services & Freight";
+      
+      // Services & Freight
+      if (m.includes("fedex") || m.includes("courier") || m.includes("master key")) return "Services & Freight";
+      
+      // Personal Care
       if (m.includes("hair") || m.includes("salon") || m.includes("fiddi") || m.includes("pharmacy")) return "Personal Care";
-      if (m.includes("auto") || m.includes("car wash") || m.includes("parking") && !m.includes("digital")) return "Automotive & Tuning";
+      
+      // Automotive & Tuning
+      if (m.includes("auto") || m.includes("car wash") || (m.includes("parking") && !m.includes("digital"))) return "Automotive & Tuning";
+      
+      // Transport
       if (m.includes("careem hala") || m.includes("taxi") || m.includes("uber")) return "Transport";
+      
+      // Groceries
       if (m.includes("supermarket") || m.includes("grocery") || m.includes("mart") || m.includes("carrefour") || m.includes("spinneys") || m.includes("lulu")) return "Groceries";
+      
+      // Subscriptions
       if (m.includes("careem plus") || m.includes("subscription") || m.includes("netflix") || m.includes("spotify") || m.includes("apple.com")) return "Subscriptions";
       
+      // Default Fallback
       return "Shopping";
     }
 
