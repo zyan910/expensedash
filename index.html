@@ -145,7 +145,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "v0.9.0";
+    const APP_VERSION = "v0.9.1";
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
     const categoryMeta = {
@@ -245,28 +245,30 @@
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument(new Uint8Array(arrayBuffer)).promise;
         
-        // Extract Card Name & Statement Period from Page 1
-        const page1 = await pdf.getPage(1);
-        const page1Content = await page1.getTextContent();
-        const page1Text = page1Content.items.map(i => i.str).join(" ");
-
-        const cardName = extractCardName(page1Text);
-        if (cardName) detectedCards.add(cardName);
-
-        const periodEnd = extractStatementPeriodEnd(page1Text);
-        if (periodEnd && (!detectedPeriodEnd || periodEnd > detectedPeriodEnd)) {
-          detectedPeriodEnd = periodEnd;
-        }
-
-        // Reconstruct visual lines using (x, y) coordinates across all pages
-        let pageLines = [];
+        let combinedRawText = "";
+        
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
-          const lines = await extractVisualLines(page);
-          pageLines.push(...lines);
+          const textContent = await page.getTextContent();
+          
+          // If on page 1, extract card details before merging text
+          if (i === 1) {
+            const page1Text = textContent.items.map(item => item.str).join(" ");
+            const cardName = extractCardName(page1Text);
+            if (cardName) detectedCards.add(cardName);
+
+            const periodEnd = extractStatementPeriodEnd(page1Text);
+            if (periodEnd && (!detectedPeriodEnd || periodEnd > detectedPeriodEnd)) {
+              detectedPeriodEnd = periodEnd;
+            }
+          }
+          
+          // Revert to robust text joining (fixes multi-line merged coordinates bug)
+          combinedRawText += textContent.items.map(item => item.str).join(" ") + " ";
         }
 
-        const fileTxs = parseTransactionsFromLines(pageLines, cardName || "Credit Card");
+        const currentCard = Array.from(detectedCards)[f] || "Credit Card";
+        const fileTxs = processTransactions(combinedRawText, currentCard);
         allTransactions.push(...fileTxs);
       }
 
@@ -285,7 +287,6 @@
     });
 
     function extractCardName(page1Text) {
-      // Match HSBC Card Name (e.g., "HSBC Live+ Credit Card Statement" -> "HSBC Live+ Card")
       const hsbcMatch = page1Text.match(/HSBC\s+([A-Za-z0-9+\s]+?)\s+Credit\s+Card/i);
       if (hsbcMatch && hsbcMatch[1]) {
         const variant = hsbcMatch[1].trim().replace(/\s+/g, ' ');
@@ -293,7 +294,6 @@
           return `HSBC ${variant} Card`;
         }
       }
-      // Match other UAE banks if uploaded later
       if (/CBD\s+Super\s+Saver/i.test(page1Text)) return "CBD Super Saver Card";
       if (/Emirates\s+NBD/i.test(page1Text)) return "Emirates NBD Card";
       if (/Citibank/i.test(page1Text)) return "Citibank Card";
@@ -302,7 +302,6 @@
     }
 
     function extractStatementPeriodEnd(page1Text) {
-      // Match "Statement Period: From 11 September 26 to 11 October 26"
       const match = page1Text.match(/Statement\s+Period:\s*From\s+\d{1,2}\s+[A-Za-z]+\s+\d{2,4}\s+to\s+(\d{1,2})\s+([A-Za-z]+)\s+(\d{2,4})/i);
       if (match) {
         const day = match[1].padStart(2, '0');
@@ -314,185 +313,112 @@
       return null;
     }
 
-    // Reconstruct visual rows from PDF.js (x, y) coordinates so stacked table rows never merge
-    async function extractVisualLines(page) {
-      const textContent = await page.getTextContent();
-      const items = textContent.items.filter(item => item.str && item.str.trim().length > 0);
-
-      // Sort top-to-bottom (Y descending), then left-to-right (X ascending)
-      items.sort((a, b) => {
-        const yDiff = b.transform[5] - a.transform[5];
-        if (Math.abs(yDiff) > 3.5) return yDiff;
-        return a.transform[4] - b.transform[4];
-      });
-
-      const lines = [];
-      let currentLine = [];
-      let currentY = null;
-
-      for (const item of items) {
-        const x = item.transform[4];
-        const y = item.transform[5];
-        if (currentY === null || Math.abs(y - currentY) <= 3.5) {
-          currentLine.push({ str: item.str.trim(), x, y });
-          if (currentY === null) currentY = y;
-        } else {
-          currentLine.sort((a, b) => a.x - b.x);
-          lines.push(currentLine);
-          currentLine = [{ str: item.str.trim(), x, y }];
-          currentY = y;
-        }
-      }
-      if (currentLine.length > 0) {
-        currentLine.sort((a, b) => a.x - b.x);
-        lines.push(currentLine);
-      }
-      return lines;
-    }
-
     function formatStandardDate(rawDate) {
-      // Clean HSBC typos like "28-Oct26-" -> "28-Oct-26"
       const cleaned = rawDate.replace(/^-|-$/g, '');
       const m = cleaned.match(/^(\d{1,2})-([a-zA-Z]{3,4})-?(\d{2})$/);
       if (!m) return cleaned;
       const day = m[1].padStart(2, '0');
       let mon = m[2];
-      // Normalize 4-letter "Sept" to "Sep" for standard JS Date parsing & clean display
+      // Normalize 'Sept' to standard 'Sep' for JS compatibility
       if (mon.toLowerCase() === 'sept') mon = 'Sep';
       return `${day} ${mon} 20${m[3]}`;
     }
 
-    function parseTransactionsFromLines(lines, cardName) {
-      // Matches DD-MMM-YY or DD-Sept-YY (and typos like 28-Oct26-)
-      const dateTokenRegex = /^(\d{1,2}-[a-zA-Z]{3,4}-?\d{2}-?)$/;
-      const amountTokenRegex = /^[\d,]+\.\d{2}(?:\s*CR)?$/i;
+    function processTransactions(text, cardName) {
+      // 1. Normalize spacing
+      text = text.replace(/\s+/g, ' ');
 
+      // 2. Split strictly using standard AND 4-letter dates (e.g. 10-Oct-26, 09-Sept-26, 28-Oct26-)
+      const dateRegex = /(\d{1,2}-[a-zA-Z]{3,4}-?\d{2}-?)/g;
+      const parts = text.split(dateRegex);
+      
       let transactions = [];
-      let currentTx = null;
+      let currentDate = null;
 
-      function finalizeCurrentTx() {
-        if (!currentTx) return;
+      for (let i = 1; i < parts.length; i += 2) {
+        let rawDate = parts[i];
+        let block = parts[i+1] ? parts[i+1].trim() : '';
 
-        const fullDetail = currentTx.detailParts.join(" ").replace(/\s+/g, " ").trim();
-        const lowerDetail = fullDetail.toLowerCase();
-
-        // Skip non-purchase / credit / header rows
-        if (currentTx.isCredit ||
-            lowerDetail.includes("opening balance") ||
-            lowerDetail.includes("closing balance") ||
-            lowerDetail.includes("total amount due") ||
-            lowerDetail.includes("cashback") ||
-            lowerDetail.includes("issuer dcc credit")) {
-          currentTx = null;
-          return;
-        }
-
-        // Determine final AED amount: prefer rightmost column (x > 500), fallback to last decimal in row
-        let amount = null;
-        if (currentTx.rightmostAmounts.length > 0) {
-          amount = currentTx.rightmostAmounts[currentTx.rightmostAmounts.length - 1];
-        } else if (currentTx.fallbackAmounts.length > 0) {
-          amount = currentTx.fallbackAmounts[currentTx.fallbackAmounts.length - 1];
-        }
-
-        if (amount !== null && amount > 0 && fullDetail.length > 0) {
-          const cleanName = cleanMerchantName(fullDetail);
-          if (cleanName.length > 0) {
-            const stdDate = formatStandardDate(currentTx.date);
-            transactions.push({
-              date: stdDate,
-              rawDateObj: new Date(stdDate),
-              merchant: formatMerchant(cleanName, amount),
-              amount: amount,
-              category: categorize(cleanName, amount),
-              card: cardName
-            });
-          }
-        }
-        currentTx = null;
-      }
-
-      for (const line of lines) {
-        if (line.length === 0) continue;
-
-        // Check if this line starts with a Transaction Date in the left column (x < 115)
-        const firstToken = line[0];
-        const isNewTxStart = firstToken.x < 115 && dateTokenRegex.test(firstToken.str);
-
-        if (isNewTxStart) {
-          finalizeCurrentTx();
-          currentTx = {
-            date: firstToken.str,
-            detailParts: [],
-            rightmostAmounts: [],
-            fallbackAmounts: [],
-            isCredit: false
-          };
-        }
-
-        if (!currentTx) continue;
-
-        // Stop collecting if we hit page footers / legal disclaimers / glossary
-        const lineText = line.map(t => t.str).join(" ");
-        if (/^Page \d+ of \d+/i.test(lineText) ||
-            lineText.includes("Glossary/Definitions") ||
-            lineText.includes("Enjoy complimentary 12-month") ||
-            lineText.includes("Get a complimentary 12-month Careem Plus")) {
-          finalizeCurrentTx();
+        // Ignore double-date gaps smoothly
+        if (block.length < 2) {
+          if (!currentDate) currentDate = rawDate;
           continue;
         }
 
-        for (let idx = 0; idx < line.length; idx++) {
-          const token = line[idx];
-          // Skip the Transaction Date token itself
-          if (isNewTxStart && idx === 0) continue;
+        if (!currentDate) currentDate = rawDate;
 
-          // Skip Posting Date tokens (located in x < 160)
-          if (token.x < 160 && dateTokenRegex.test(token.str)) continue;
-
-          // Check for CR (Credits/Refunds/Payments)
-          if (/^CR$/i.test(token.str) || /\d+\.\d{2}\s*CR$/i.test(token.str)) {
-            currentTx.isCredit = true;
-          }
-
-          // Collect amounts by X-column position
-          if (token.x >= 380) {
-            const numMatch = token.str.match(/([\d,]+\.\d{2})/);
-            if (numMatch) {
-              const val = parseFloat(numMatch[1].replace(/,/g, ''));
-              if (token.x >= 500) {
-                currentTx.rightmostAmounts.push(val);
-              } else {
-                currentTx.fallbackAmounts.push(val);
-              }
-            }
-          } else if (token.x >= 150 && token.x < 380) {
-            // Transaction Details column only (excludes Original Amount & VAT columns!)
-            if (!amountTokenRegex.test(token.str)) {
-              currentTx.detailParts.push(token.str);
-            }
-          }
+        let lowerBlock = block.toLowerCase();
+        
+        // Skip non-transaction fluff
+        if (lowerBlock.includes("opening balance") || 
+            lowerBlock.includes("closing balance") ||
+            lowerBlock.includes("total amount due") ||
+            lowerBlock.includes("payment received") ||
+            lowerBlock.includes("cashback") ||
+            lowerBlock.includes("issuer dcc credit") ||
+            lowerBlock.includes("revrsl of stnd proc")) {
+          currentDate = null;
+          continue;
         }
+
+        // 3. Extract ALL numbers that look like currency in this entire transaction block
+        const amounts = block.match(/[\d,]+\.\d{2}/g);
+        if (!amounts) {
+          currentDate = null;
+          continue;
+        }
+
+        // 4. Target the ABSOLUTE LAST decimal. This perfectly bypasses stacked FX rows.
+        let amountStr = amounts[amounts.length - 1];
+        
+        // 5. Check if 'CR' appears AFTER the final billed amount (Filters payments/refunds)
+        let afterAmount = block.substring(block.lastIndexOf(amountStr) + amountStr.length);
+        if (/\bCR\b/i.test(afterAmount)) {
+          currentDate = null;
+          continue; 
+        }
+
+        let amount = parseFloat(amountStr.replace(/,/g, ''));
+
+        // 6. The merchant text is everything before the final AED amount
+        let merchant = block.substring(0, block.lastIndexOf(amountStr)).trim();
+
+        // 7. Cleanup the Merchant String
+        merchant = merchant.replace(/NFC\s*-\s*\(AP-PAY\)-|IAP\s*-\s*\(AP-PAY\)-/ig, '').trim();
+        
+        // Wipe stacked foreign exchange rows completely
+        merchant = merchant.replace(/VA USD\/AED.*$/i, '');
+        merchant = merchant.replace(/USD\/AED.*$/i, '');
+        merchant = merchant.replace(/FOREIGN CURRENCY PROCESSING FEE.*$/i, '');
+        merchant = merchant.replace(/STND PROC\. FEE.*$/i, '');
+        merchant = merchant.replace(/ISSUER DCC DEBIT.*$/i, '');
+
+        // Wipe trailing foreign currency values (e.g. " USD 1,140.00 4,187.56" or " 15.00 GBP 75.50")
+        merchant = merchant.replace(/\s+[A-Z]{3}\s+[\d,]+\.\d{2}.*$/i, '');
+        merchant = merchant.replace(/\s+[\d,]+\.\d{2}\s+[A-Z]{3}.*$/i, '');
+
+        // Catch stray footers that sneaked in
+        merchant = merchant.replace(/Page \d+.*$/i, '');
+        merchant = merchant.replace(/HSBC Bank Middle East.*$/i, '');
+        
+        merchant = merchant.replace(/[-\s]+$/, '').trim(); 
+
+        if (merchant.length > 0) {
+          const stdDate = formatStandardDate(currentDate);
+          transactions.push({
+            date: stdDate,
+            rawDateObj: new Date(stdDate),
+            merchant: formatMerchant(merchant, amount),
+            amount: amount,
+            category: categorize(merchant, amount),
+            card: cardName
+          });
+        }
+
+        currentDate = null;
       }
 
-      finalizeCurrentTx();
       return transactions;
-    }
-
-    function cleanMerchantName(raw) {
-      let m = raw;
-      // Remove Apple Pay prefixes
-      m = m.replace(/\b(?:NFC|IAP)\s*-\s*\(AP-PAY\)-/ig, '');
-      // Remove HSBC FX / fee boilerplate lines
-      m = m.replace(/FOREIGN CURRENCY PROCESSING FEE/ig, '');
-      m = m.replace(/STND PROC\. FEE \(AS PER SCHEMES\)/ig, '');
-      m = m.replace(/STND PROC\. FEE FOR DCC TRNX/ig, '');
-      m = m.replace(/ISSUER DCC DEBIT TRANSACTION/ig, '');
-      m = m.replace(/\b[A-Z]{3}\/AED\b/ig, '');
-      m = m.replace(/\b\d{6,}\b/g, ''); // Remove FX reference IDs like 272234905
-      // Clean up extra whitespace and trailing hyphens
-      m = m.replace(/\s+/g, ' ').replace(/^[-\s]+|[-\s]+$/g, '').trim();
-      return m;
     }
 
     function formatMerchant(merchant, amount) {
@@ -509,37 +435,21 @@
     function categorize(merchant, amount) {
       const m = merchant.toLowerCase();
 
-      // 1. Education & Professional
       if (m.includes("cfa institute") || m.includes("university") || m.includes("college") || 
           m.includes("academy") || m.includes("coursera") || m.includes("udemy") || 
-          m.includes("pearson") || m.includes("prometric")) {
-        return "Education & Professional";
-      }
+          m.includes("pearson") || m.includes("prometric")) return "Education & Professional";
 
-      // 2. Government & Dubai Smart Services
       if (m.includes("digital dubai") || m.includes("dubai digital") || m.includes("smart dubai") || 
-          m.includes("authority") || m.includes("salik") || m.includes("tasheel") || m.includes("amer")) {
-        return "Government & Services";
-      }
+          m.includes("authority") || m.includes("salik") || m.includes("tasheel") || m.includes("amer")) return "Government & Services";
 
-      // 3. Fuel
-      if (m.includes("enoc") || m.includes("adnoc") || m.includes("eppco") || m.includes("emarat") || m.includes("cafu")) {
-        return "Fuel";
-      }
+      if (m.includes("enoc") || m.includes("adnoc") || m.includes("eppco") || m.includes("emarat") || m.includes("cafu")) return "Fuel";
 
-      // 4. Services & Driving
-      if (m.includes("belhasa") || m.includes("driving center") || m.includes("emirates driving")) {
-        return "Services & Driving";
-      }
+      if (m.includes("belhasa") || m.includes("driving center") || m.includes("emirates driving")) return "Services & Driving";
 
-      // 5. Automotive & Tuning
       if (m.includes("z1 motorsports") || m.includes("motorsport") || m.includes("shanghai global auto") || 
           m.includes("autocare") || m.includes("auto care") || m.includes("car wash") || 
-          m.includes("garage") || m.includes("tyre") || (m.includes("parking") && !m.includes("digital"))) {
-        return "Automotive & Tuning";
-      }
+          m.includes("garage") || m.includes("tyre") || (m.includes("parking") && !m.includes("digital"))) return "Automotive & Tuning";
 
-      // 6. Dining & Cafes
       if (m.includes("fresh bakes") || m.includes("coffee") || m.includes("cafe") || m.includes("cafeteri") ||
           m.includes("restaurant") || m.includes("restaura") || m.includes("mcdonald") || m.includes("pizza") ||
           m.includes("burger") || m.includes("zomato") || m.includes("talabat") || m.includes("careem food") ||
@@ -549,57 +459,33 @@
           m.includes("changs") || m.includes("lazy cat") || m.includes("grillo") || m.includes("brioche") ||
           m.includes("cheese cake") || m.includes("cheesecake") || m.includes("lounge") || m.includes("culinary") ||
           m.includes("cookie dealer") || m.includes("fusion") || m.includes("bebax") || m.includes("chefs") ||
-          m.includes("daves hot chicken") || m.includes("koukh al shay") || m.includes("kfc") || m.includes("subway")) {
-        return "Dining & Cafes";
-      }
+          m.includes("daves hot chicken") || m.includes("koukh al shay") || m.includes("kfc") || m.includes("subway")) return "Dining & Cafes";
 
-      // 7. Entertainment
       if (m.includes("tiger strikes") || m.includes("billiards") || m.includes("bowling") || 
           m.includes("que club") || m.includes("cinema") || m.includes("vox") || m.includes("roxy") || 
-          m.includes("reel") || m.includes("topgolf")) {
-        return "Entertainment";
-      }
+          m.includes("reel") || m.includes("topgolf")) return "Entertainment";
 
-      // 8. Travel & Stays
       if (m.includes("hotel") || m.includes("marriott") || m.includes("hilton") || m.includes("hyatt") ||
           m.includes("airbnb") || m.includes("booking.com") || m.includes("agoda") || m.includes("emirates") ||
-          m.includes("flydubai") || m.includes("etihad") || m.includes("swiss") || m.includes("norwegian")) {
-        return "Travel & Stays";
-      }
+          m.includes("flydubai") || m.includes("etihad") || m.includes("swiss") || m.includes("norwegian")) return "Travel & Stays";
 
-      // 9. Transport
       if (m.includes("careem hala") || m.includes("taxi") || m.includes("uber") || 
-          m.includes("dubai metro") || m.includes("rta-dubai metro")) {
-        return "Transport";
-      }
+          m.includes("dubai metro") || m.includes("rta-dubai metro")) return "Transport";
 
-      // 10. Groceries
       if (m.includes("supermarket") || m.includes("grocery") || m.includes("carrefour") || 
           m.includes("spinneys") || m.includes("lulu") || m.includes("choithrams") || m.includes("waitrose") ||
-          m.includes("fresh day") || m.includes("zahra al lotus")) {
-        return "Groceries";
-      }
+          m.includes("fresh day") || m.includes("zahra al lotus")) return "Groceries";
 
-      // 11. Personal Care
       if (m.includes("alrabbash") || m.includes("fiddi") || m.includes("hair") || m.includes("salon") || 
           m.includes("barber") || m.includes("pharmacy") || m.includes("aster") || m.includes("life pharmacy") ||
-          m.includes("ibrahem al qurashi") || m.includes("sephora")) {
-        return "Personal Care";
-      }
+          m.includes("ibrahem al qurashi") || m.includes("sephora")) return "Personal Care";
 
-      // 12. Services & Freight
       if (m.includes("fedex") || m.includes("dhl") || m.includes("aramex") || m.includes("ups") || 
-          m.includes("courier") || m.includes("master key")) {
-        return "Services & Freight";
-      }
+          m.includes("courier") || m.includes("master key")) return "Services & Freight";
 
-      // 13. Subscriptions
       if (m.includes("careem plus") || m.includes("subscription") || m.includes("netflix") || 
-          m.includes("spotify") || m.includes("apple.com") || m.includes("gymnation") || m.includes("icloud")) {
-        return "Subscriptions";
-      }
+          m.includes("spotify") || m.includes("apple.com") || m.includes("gymnation") || m.includes("icloud")) return "Subscriptions";
 
-      // 14. Shopping (Default Fallback)
       return "Shopping";
     }
 
@@ -615,7 +501,6 @@
       document.getElementById('main-header-label').innerText = headerLabelText;
       document.getElementById('main-header-title').innerText = `${month} ${year} Dashboard`;
 
-      // Prepare clean filename for Save HTML export
       const safeCards = cardsTitle.replace(/[^a-zA-Z0-9]+/g, '_');
       currentExportFilename = `${safeCards}_${month}_${year}_Dashboard.html`;
 
