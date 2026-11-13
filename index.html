@@ -19,15 +19,29 @@
       margin: 0; padding: 24px 16px 48px; font-family: 'Inter', -apple-system, sans-serif;
       background: radial-gradient(ellipse 120% 280px at 50% 0px, rgba(145, 28, 52, 0.55) 0%, rgba(145, 28, 52, 0.15) 55%, transparent 100%), #000000;
       background-attachment: fixed; color: #F1F5F9; -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
     }
 
-    .container { max-width: 620px; margin: 0 auto; }
+    .container { max-width: 620px; margin: 0 auto; position: relative; }
+
+    /* Smooth View Transitions */
+    .view-panel {
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      opacity: 0; visibility: hidden; position: absolute; width: 100%; top: 0; left: 0;
+      transform: translateY(15px) scale(0.98);
+    }
+    .view-panel.active {
+      opacity: 1; visibility: visible; position: relative;
+      transform: translateY(0) scale(1);
+    }
 
     /* Top Action Bar */
     .top-bar {
       display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 16px; gap: 10px;
+      margin-bottom: 16px; gap: 8px; flex-wrap: wrap;
     }
+    .action-group { display: flex; gap: 8px; }
+    
     .action-btn {
       background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12);
       color: #F1F5F9; padding: 8px 14px; border-radius: 10px; font-size: 12px;
@@ -35,13 +49,23 @@
       transition: 0.2s ease; backdrop-filter: blur(8px);
     }
     .action-btn:hover { background: rgba(255, 255, 255, 0.12); }
-    .action-btn.save-btn {
-      background: rgba(145, 28, 52, 0.35); border-color: rgba(255, 123, 149, 0.4); color: #FFD1DA;
-    }
-    .action-btn.save-btn:hover { background: rgba(145, 28, 52, 0.55); }
+    .action-btn.save-html-btn { background: rgba(145, 28, 52, 0.35); border-color: rgba(255, 123, 149, 0.4); color: #FFD1DA; }
+    .action-btn.save-html-btn:hover { background: rgba(145, 28, 52, 0.55); }
+    .action-btn.save-csv-btn { background: rgba(34, 197, 94, 0.2); border-color: rgba(74, 222, 128, 0.4); color: #86EFAC; }
+    .action-btn.save-csv-btn:hover { background: rgba(34, 197, 94, 0.3); }
 
     .header-label { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #94A3B8; margin-bottom: 4px; font-weight: 700; }
     .header-title { font-size: 24px; font-weight: 800; color: #FFFFFF; letter-spacing: -0.02em; margin-bottom: 20px; }
+
+    /* Search Bar */
+    .search-container { margin-bottom: 16px; }
+    .search-input {
+      width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+      padding: 14px 16px; border-radius: 14px; color: #FFF; font-family: inherit; font-size: 14px;
+      outline: none; transition: 0.2s; backdrop-filter: blur(8px);
+    }
+    .search-input:focus { border-color: #FF7B95; background: rgba(255,255,255,0.08); }
+    .search-input::placeholder { color: #64748B; }
 
     /* Upload Zone */
     .upload-zone {
@@ -57,16 +81,33 @@
 
     /* Dashboard UI Elements */
     .main-card {
-      border-radius: 20px; padding: 22px 24px; margin-bottom: 16px;
+      border-radius: 20px; padding: 22px 24px; margin-bottom: 16px; position: relative;
       background: linear-gradient(135deg, rgba(145, 28, 52, 0.35) 0%, rgba(18, 18, 18, 0.8) 100%);
       border: 1px solid rgba(145, 28, 52, 0.5); box-shadow: 0 10px 30px -10px rgba(145, 28, 52, 0.4);
       backdrop-filter: blur(12px);
     }
     .card-title { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 800; margin-bottom: 4px; color: #FF7B95; }
     .card-subtitle { font-size: 11px; color: #CBD5E1; margin-bottom: 14px; font-weight: 600; }
-    .card-total { font-size: 38px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 16px; line-height: 1; color: #FFFFFF; text-shadow: 0 0 20px rgba(145, 28, 52, 0.3); }
     
-    .progress-bar { display: flex; border-radius: 8px; overflow: hidden; height: 8px; gap: 2px; background: rgba(0,0,0,0.4); padding: 1px; }
+    /* Conic Donut Chart */
+    .donut-container { position: relative; width: 180px; height: 180px; margin: 28px auto 20px; }
+    .donut-chart { width: 100%; height: 100%; border-radius: 50%; transition: background 0.3s; box-shadow: 0 0 20px rgba(0,0,0,0.4); }
+    .donut-inner { 
+      position: absolute; top: 14px; left: 14px; right: 14px; bottom: 14px; 
+      background: #141414; border-radius: 50%; 
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      box-shadow: inset 0 4px 14px rgba(0,0,0,0.5);
+    }
+    .donut-lbl { font-size: 9px; color: #94A3B8; text-transform: uppercase; font-weight: 800; letter-spacing: 0.1em; margin-bottom: 4px; }
+    .donut-val { font-size: 22px; color: #FFFFFF; font-weight: 800; letter-spacing: -0.03em; }
+
+    .trend-badge {
+      display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 700; position: absolute; top: 22px; right: 24px;
+    }
+    .trend-up { background: rgba(244, 63, 94, 0.15); color: #FDA4AF; border: 1px solid rgba(244, 63, 94, 0.3); }
+    .trend-down { background: rgba(74, 222, 128, 0.15); color: #86EFAC; border: 1px solid rgba(74, 222, 128, 0.3); }
+
     .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 24px; }
     .stat-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 14px; padding: 12px 10px; text-align: center; }
     .stat-num { font-size: 15px; font-weight: 800; color: #F8FAFC; margin-bottom: 2px; }
@@ -99,6 +140,7 @@
     .cat-right { text-align: right; }
     .cat-amount { font-size: 14.5px; font-weight: 800; color: #FFFFFF; }
     .cat-pct { font-size: 10px; font-weight: 700; color: var(--cat-color); margin-top: 2px; }
+    
     .cat-bar-bg { background: rgba(255, 255, 255, 0.06); border-radius: 4px; height: 3px; margin: 0 18px 4px 18px; }
     .cat-bar-fill { height: 100%; border-radius: 4px; background: var(--cat-color); }
 
@@ -109,43 +151,82 @@
     .merchants-list::-webkit-scrollbar { width: 4px; }
     .merchants-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
 
-    .merchant-item { font-size: 11.5px; color: #A1A1AA; display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,0.05); }
+    .merchant-item { 
+      font-size: 11.5px; color: #A1A1AA; display: flex; align-items: center; 
+      justify-content: space-between; margin-bottom: 8px; padding: 6px 0; 
+      border-bottom: 1px dashed rgba(255,255,255,0.05); 
+    }
     .merchant-item:last-child { border-bottom: none; margin-bottom: 0; }
     .m-left { display: flex; align-items: center; gap: 8px; font-weight: 500; min-width: 0; }
-    .m-name { color: #E4E4E7; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+    
+    .flag-btn {
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+      color: #94A3B8; border-radius: 6px; font-size: 10px; cursor: pointer;
+      width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+      transition: 0.2s; flex-shrink: 0;
+    }
+    .flag-btn.flagged { background: rgba(59, 130, 246, 0.2); border-color: rgba(59, 130, 246, 0.5); }
+    .merchant-item.is-flagged .m-name { color: #64748B; text-decoration: line-through; }
+    
+    .m-name { 
+      color: #E4E4E7; font-weight: 600; overflow: hidden; text-overflow: ellipsis; 
+      cursor: pointer; transition: 0.2s; border-bottom: 1px dashed transparent;
+    }
+    .m-name:hover { color: #FFF; border-bottom-color: #64748B; }
     .m-date { font-size: 9.5px; color: #71717A; font-weight: 500; margin-left: 4px; white-space: nowrap; }
     .merchant-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--cat-color); flex-shrink: 0; }
     .m-amt { font-weight: 700; color: #F4F4F5; white-space: nowrap; margin-left: 8px; }
 
-    .footer { text-align: center; margin-top: 28px; font-size: 11px; color: #64748B; font-weight: 600; letter-spacing: 0.04em; }
+    .footer { text-align: center; font-size: 11px; color: #64748B; font-weight: 600; letter-spacing: 0.04em; }
   </style>
 </head>
 <body>
   <div class="container" id="app-container">
-    <!-- Action Bar (Hidden on Upload Screen) -->
-    <div class="top-bar" id="top-bar" style="display: none;">
-      <button class="action-btn" id="back-btn" type="button">← Back</button>
-      <button class="action-btn save-btn" id="save-btn" type="button">↓ Save HTML</button>
+    
+    <!-- UPLOAD PANEL -->
+    <div id="view-upload" class="view-panel active">
+      <div class="header-label">Offline PDF Engine</div>
+      <div class="header-title">Expense Parser</div>
+
+      <div class="upload-zone" id="drop-zone">
+        <div style="font-size: 40px; margin-bottom: 10px;" id="upload-icon">📁</div>
+        <div style="font-weight: 600;" id="upload-text">Upload Credit Card Statements</div>
+        <div style="font-size: 12px; color: #94A3B8; margin-top: 8px;">Select one or multiple PDFs for a single or consolidated dashboard.</div>
+        <label class="upload-btn">
+          Select PDF File(s)
+          <input type="file" id="file-input" accept="application/pdf" multiple>
+        </label>
+      </div>
+      
+      <div class="footer" style="margin-top: 24px;" id="version-tag"></div>
     </div>
 
-    <div class="header-label" id="main-header-label">Statements Analysis</div>
-    <div class="header-title" id="main-header-title">Expense Dashboard</div>
+    <!-- DASHBOARD PANEL -->
+    <div id="view-dashboard" class="view-panel">
+      <div class="top-bar">
+        <button class="action-btn" id="back-btn" type="button">← Back</button>
+        <div class="action-group">
+          <button class="action-btn save-csv-btn" id="save-csv-btn" type="button">↓ CSV</button>
+          <button class="action-btn save-html-btn" id="save-html-btn" type="button">↓ HTML</button>
+        </div>
+      </div>
 
-    <div class="upload-zone" id="drop-zone">
-      <div style="font-size: 40px; margin-bottom: 10px;" id="upload-icon">📁</div>
-      <div style="font-weight: 600;" id="upload-text">Upload Credit Card Statements (PDF)</div>
-      <div style="font-size: 12px; color: #94A3B8; margin-top: 8px;">Select one or multiple PDFs for a single or consolidated dashboard.</div>
-      <label class="upload-btn">
-        Select PDF File(s)
-        <input type="file" id="file-input" accept="application/pdf" multiple>
-      </label>
+      <div class="header-label" id="main-header-label">Statements Analysis</div>
+      <div class="header-title" id="main-header-title">Expense Dashboard</div>
+
+      <div class="search-container">
+        <input type="text" id="search-input" class="search-input" placeholder="🔍 Search merchants or categories...">
+      </div>
+
+      <div id="dashboard-output" style="margin-top: 0px;"></div>
     </div>
 
-    <div id="dashboard-output" style="display: none; margin-top: 0px;"></div>
   </div>
 
   <script>
-    const APP_VERSION = "v0.9.1";
+    const APP_VERSION = "v0.9.3";
+    document.getElementById('version-tag').innerText = APP_VERSION;
+    
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
     const categoryMeta = {
@@ -154,7 +235,7 @@
       "Education & Professional": { icon: "🎓", color: "#6366F1" },
       "Automotive & Tuning": { icon: "🚗", color: "#F97316" },
       "Services & Driving": { icon: "🚘", color: "#84CC16" },
-      "Government & Services": { icon: "🏛️", color: "#475569" },
+      "Government & Utilities": { icon: "🏛️", color: "#475569" },
       "Travel & Stays": { icon: "✈️", color: "#0EA5E9" },
       "Shopping": { icon: "🛍️", color: "#8B5CF6" },
       "Services & Freight": { icon: "📦", color: "#A855F7" },
@@ -162,7 +243,8 @@
       "Entertainment": { icon: "🎳", color: "#D946EF" },
       "Transport": { icon: "🚕", color: "#22D3EE" },
       "Groceries": { icon: "🛒", color: "#22C55E" },
-      "Subscriptions": { icon: "📱", color: "#64748B" }
+      "Subscriptions": { icon: "📱", color: "#64748B" },
+      "Reimbursable": { icon: "💼", color: "#3B82F6" }
     };
 
     const oneTimeCategories = [
@@ -173,27 +255,44 @@
       "Automotive & Tuning"
     ];
 
-    let currentExportFilename = "Expense_Dashboard.html";
+    let currentExportFilename = "Expense_Dashboard";
+    
+    // Global State for UI
+    let globalTransactions = []; 
+    let globalMonth = "";
+    let globalYear = "";
+    let globalFileCount = 0;
+    let globalCardNames = [];
+    
+    // Load Local Storage Memory
+    let merchantAliases = JSON.parse(localStorage.getItem('merchantAliases')) || {};
+    let reimbursableFlags = JSON.parse(localStorage.getItem('reimbursableFlags')) || {};
 
-    // Back Button Handler
+    // View Transitions
+    function switchView(fromId, toId) {
+      const fromEl = document.getElementById(fromId);
+      const toEl = document.getElementById(toId);
+      fromEl.classList.remove('active');
+      setTimeout(() => {
+        toEl.classList.add('active');
+      }, 200);
+    }
+
     document.getElementById('back-btn').addEventListener('click', function() {
-      document.getElementById('dashboard-output').style.display = 'none';
-      document.getElementById('dashboard-output').innerHTML = '';
-      document.getElementById('top-bar').style.display = 'none';
-      
-      const dropZone = document.getElementById('drop-zone');
-      dropZone.style.display = 'block';
-      dropZone.classList.remove('processing');
-      document.getElementById('upload-icon').innerText = '📁';
-      document.getElementById('upload-text').innerText = 'Upload Credit Card Statements (PDF)';
-      document.getElementById('file-input').value = '';
-
-      document.getElementById('main-header-label').innerText = 'Statements Analysis';
-      document.getElementById('main-header-title').innerText = 'Expense Dashboard';
+      switchView('view-dashboard', 'view-upload');
+      setTimeout(() => {
+        document.getElementById('dashboard-output').innerHTML = '';
+        document.getElementById('search-input').value = '';
+        const dropZone = document.getElementById('drop-zone');
+        dropZone.classList.remove('processing');
+        document.getElementById('upload-icon').innerText = '📁';
+        document.getElementById('upload-text').innerText = 'Upload Credit Card Statements';
+        document.getElementById('file-input').value = '';
+      }, 400);
     });
 
-    // Save HTML Button Handler
-    document.getElementById('save-btn').addEventListener('click', function() {
+    // Exports
+    document.getElementById('save-html-btn').addEventListener('click', function() {
       const styles = document.getElementById('dashboard-styles').innerHTML;
       const headerLabel = document.getElementById('main-header-label').innerText;
       const headerTitle = document.getElementById('main-header-title').innerText;
@@ -215,17 +314,93 @@
   </div>
 </body>
 </html>`;
+      downloadFile(standaloneHtml, `${currentExportFilename}.html`, 'text/html;charset=utf-8');
+    });
 
-      const blob = new Blob([standaloneHtml], { type: 'text/html;charset=utf-8' });
+    document.getElementById('save-csv-btn').addEventListener('click', function() {
+      if(globalTransactions.length === 0) return;
+      let csvContent = "Date,Merchant,Category,Reimbursable,Amount,Card\n";
+      globalTransactions.forEach(t => {
+        const safeMerchant = `"${t.merchant.replace(/"/g, '""')}"`;
+        const isReimbursable = reimbursableFlags[t.txId] ? "Yes" : "No";
+        csvContent += `${t.date},${safeMerchant},${t.category},${isReimbursable},${t.amount},${t.card}\n`;
+      });
+      downloadFile(csvContent, `${currentExportFilename}.csv`, 'text/csv;charset=utf-8');
+    });
+
+    function downloadFile(content, filename, type) {
+      const blob = new Blob([content], { type: type });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = currentExportFilename;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+    }
+
+    // Interactive Search Filtering
+    document.getElementById('search-input').addEventListener('input', function(e) {
+      const term = e.target.value.toLowerCase();
+      if (!term) {
+        renderDashboardCore(globalTransactions);
+        return;
+      }
+      const filteredTxs = globalTransactions.filter(t => 
+        t.merchant.toLowerCase().includes(term) || 
+        t.category.toLowerCase().includes(term) ||
+        t.amount.toString().includes(term) ||
+        t.date.toLowerCase().includes(term)
+      );
+      renderDashboardCore(filteredTxs);
     });
+
+    // Custom Alias Handler
+    window.renameMerchant = function(el) {
+      const currentName = el.innerText;
+      const newName = prompt(`Rename "${currentName}" to:\n(This will be remembered for all future uploads)`, currentName);
+      
+      if (newName && newName.trim() !== "" && newName !== currentName) {
+        merchantAliases[currentName] = newName.trim();
+        localStorage.setItem('merchantAliases', JSON.stringify(merchantAliases));
+        
+        // Update live state
+        globalTransactions.forEach(t => {
+          if(t.merchant === currentName) {
+            t.merchant = newName.trim();
+            t.category = categorize(t.merchant, t.amount);
+          }
+        });
+        
+        // Re-render
+        const term = document.getElementById('search-input').value.toLowerCase();
+        if (term) {
+          const filteredTxs = globalTransactions.filter(t => t.merchant.toLowerCase().includes(term) || t.category.toLowerCase().includes(term));
+          renderDashboardCore(filteredTxs);
+        } else {
+          renderDashboardCore(globalTransactions);
+        }
+      }
+    };
+
+    // Flag Handler
+    window.toggleFlag = function(txId) {
+      if (reimbursableFlags[txId]) {
+        delete reimbursableFlags[txId];
+      } else {
+        reimbursableFlags[txId] = true;
+      }
+      localStorage.setItem('reimbursableFlags', JSON.stringify(reimbursableFlags));
+      
+      const term = document.getElementById('search-input').value.toLowerCase();
+      if (term) {
+        const filteredTxs = globalTransactions.filter(t => t.merchant.toLowerCase().includes(term) || t.category.toLowerCase().includes(term));
+        renderDashboardCore(filteredTxs);
+      } else {
+        renderDashboardCore(globalTransactions);
+      }
+    };
 
     // File Upload Handler
     document.getElementById('file-input').addEventListener('change', async function(e) {
@@ -251,7 +426,6 @@
           const page = await pdf.getPage(i);
           const textContent = await page.getTextContent();
           
-          // If on page 1, extract card details before merging text
           if (i === 1) {
             const page1Text = textContent.items.map(item => item.str).join(" ");
             const cardName = extractCardName(page1Text);
@@ -263,7 +437,6 @@
             }
           }
           
-          // Revert to robust text joining (fixes multi-line merged coordinates bug)
           combinedRawText += textContent.items.map(item => item.str).join(" ") + " ";
         }
 
@@ -272,27 +445,42 @@
         allTransactions.push(...fileTxs);
       }
 
-      let statementMonth = "Consolidated";
-      let statementYear = "";
+      globalTransactions = allTransactions;
+      globalFileCount = files.length;
+      globalCardNames = Array.from(detectedCards);
+      
+      globalMonth = "Consolidated";
+      globalYear = "";
       if (detectedPeriodEnd) {
-        statementMonth = detectedPeriodEnd.toLocaleString('en-US', { month: 'long' });
-        statementYear = detectedPeriodEnd.getFullYear();
+        globalMonth = detectedPeriodEnd.toLocaleString('en-US', { month: 'long' });
+        globalYear = detectedPeriodEnd.getFullYear();
       } else if (allTransactions.length > 0) {
         let maxDate = new Date(Math.max.apply(null, allTransactions.map(t => t.rawDateObj)));
-        statementMonth = maxDate.toLocaleString('en-US', { month: 'long' });
-        statementYear = maxDate.getFullYear();
+        globalMonth = maxDate.toLocaleString('en-US', { month: 'long' });
+        globalYear = maxDate.getFullYear();
       }
 
-      renderDashboard(allTransactions, statementMonth, statementYear, files.length, Array.from(detectedCards));
+      switchView('view-upload', 'view-dashboard');
+      
+      const cardsTitle = globalCardNames.length > 0 ? globalCardNames.join(" & ") : "Credit Card";
+      const headerLabelText = globalFileCount > 1 
+        ? `${cardsTitle} · Consolidated Analysis` 
+        : `${cardsTitle} · Statement Analysis`;
+        
+      document.getElementById('main-header-label').innerText = headerLabelText;
+      document.getElementById('main-header-title').innerText = `${globalMonth} ${globalYear} Dashboard`;
+
+      const safeCards = cardsTitle.replace(/[^a-zA-Z0-9]+/g, '_');
+      currentExportFilename = `${safeCards}_${globalMonth}_${globalYear}_Dashboard`;
+
+      renderDashboardCore(globalTransactions);
     });
 
     function extractCardName(page1Text) {
       const hsbcMatch = page1Text.match(/HSBC\s+([A-Za-z0-9+\s]+?)\s+Credit\s+Card/i);
       if (hsbcMatch && hsbcMatch[1]) {
         const variant = hsbcMatch[1].trim().replace(/\s+/g, ' ');
-        if (!variant.toLowerCase().includes("bank")) {
-          return `HSBC ${variant} Card`;
-        }
+        if (!variant.toLowerCase().includes("bank")) return `HSBC ${variant} Card`;
       }
       if (/CBD\s+Super\s+Saver/i.test(page1Text)) return "CBD Super Saver Card";
       if (/Emirates\s+NBD/i.test(page1Text)) return "Emirates NBD Card";
@@ -319,16 +507,12 @@
       if (!m) return cleaned;
       const day = m[1].padStart(2, '0');
       let mon = m[2];
-      // Normalize 'Sept' to standard 'Sep' for JS compatibility
       if (mon.toLowerCase() === 'sept') mon = 'Sep';
       return `${day} ${mon} 20${m[3]}`;
     }
 
     function processTransactions(text, cardName) {
-      // 1. Normalize spacing
       text = text.replace(/\s+/g, ' ');
-
-      // 2. Split strictly using standard AND 4-letter dates (e.g. 10-Oct-26, 09-Sept-26, 28-Oct26-)
       const dateRegex = /(\d{1,2}-[a-zA-Z]{3,4}-?\d{2}-?)/g;
       const parts = text.split(dateRegex);
       
@@ -339,85 +523,64 @@
         let rawDate = parts[i];
         let block = parts[i+1] ? parts[i+1].trim() : '';
 
-        // Ignore double-date gaps smoothly
         if (block.length < 2) {
           if (!currentDate) currentDate = rawDate;
           continue;
         }
 
         if (!currentDate) currentDate = rawDate;
-
         let lowerBlock = block.toLowerCase();
         
-        // Skip non-transaction fluff
-        if (lowerBlock.includes("opening balance") || 
-            lowerBlock.includes("closing balance") ||
-            lowerBlock.includes("total amount due") ||
-            lowerBlock.includes("payment received") ||
-            lowerBlock.includes("cashback") ||
-            lowerBlock.includes("issuer dcc credit") ||
+        if (lowerBlock.includes("opening balance") || lowerBlock.includes("closing balance") ||
+            lowerBlock.includes("total amount due") || lowerBlock.includes("payment received") ||
+            lowerBlock.includes("cashback") || lowerBlock.includes("issuer dcc credit") ||
             lowerBlock.includes("revrsl of stnd proc")) {
           currentDate = null;
           continue;
         }
 
-        // 3. Extract ALL numbers that look like currency in this entire transaction block
         const amounts = block.match(/[\d,]+\.\d{2}/g);
-        if (!amounts) {
-          currentDate = null;
-          continue;
-        }
+        if (!amounts) { currentDate = null; continue; }
 
-        // 4. Target the ABSOLUTE LAST decimal. This perfectly bypasses stacked FX rows.
         let amountStr = amounts[amounts.length - 1];
-        
-        // 5. Check if 'CR' appears AFTER the final billed amount (Filters payments/refunds)
         let afterAmount = block.substring(block.lastIndexOf(amountStr) + amountStr.length);
-        if (/\bCR\b/i.test(afterAmount)) {
-          currentDate = null;
-          continue; 
-        }
+        if (/\bCR\b/i.test(afterAmount)) { currentDate = null; continue; }
 
         let amount = parseFloat(amountStr.replace(/,/g, ''));
-
-        // 6. The merchant text is everything before the final AED amount
         let merchant = block.substring(0, block.lastIndexOf(amountStr)).trim();
 
-        // 7. Cleanup the Merchant String
         merchant = merchant.replace(/NFC\s*-\s*\(AP-PAY\)-|IAP\s*-\s*\(AP-PAY\)-/ig, '').trim();
-        
-        // Wipe stacked foreign exchange rows completely
         merchant = merchant.replace(/VA USD\/AED.*$/i, '');
         merchant = merchant.replace(/USD\/AED.*$/i, '');
         merchant = merchant.replace(/FOREIGN CURRENCY PROCESSING FEE.*$/i, '');
         merchant = merchant.replace(/STND PROC\. FEE.*$/i, '');
         merchant = merchant.replace(/ISSUER DCC DEBIT.*$/i, '');
-
-        // Wipe trailing foreign currency values (e.g. " USD 1,140.00 4,187.56" or " 15.00 GBP 75.50")
         merchant = merchant.replace(/\s+[A-Z]{3}\s+[\d,]+\.\d{2}.*$/i, '');
         merchant = merchant.replace(/\s+[\d,]+\.\d{2}\s+[A-Z]{3}.*$/i, '');
-
-        // Catch stray footers that sneaked in
         merchant = merchant.replace(/Page \d+.*$/i, '');
         merchant = merchant.replace(/HSBC Bank Middle East.*$/i, '');
-        
         merchant = merchant.replace(/[-\s]+$/, '').trim(); 
 
         if (merchant.length > 0) {
+          // Generate Immutable TX ID based on raw original name
+          const originalM = formatMerchant(merchant, amount);
           const stdDate = formatStandardDate(currentDate);
+          const txId = btoa(`${stdDate}|${originalM}|${amount}`).replace(/=/g, '');
+
+          const finalM = merchantAliases[originalM] || originalM;
+
           transactions.push({
+            txId: txId,
             date: stdDate,
             rawDateObj: new Date(stdDate),
-            merchant: formatMerchant(merchant, amount),
+            merchant: finalM,
             amount: amount,
-            category: categorize(merchant, amount),
+            category: categorize(finalM, amount),
             card: cardName
           });
         }
-
         currentDate = null;
       }
-
       return transactions;
     }
 
@@ -439,16 +602,25 @@
           m.includes("academy") || m.includes("coursera") || m.includes("udemy") || 
           m.includes("pearson") || m.includes("prometric")) return "Education & Professional";
 
-      if (m.includes("digital dubai") || m.includes("dubai digital") || m.includes("smart dubai") || 
-          m.includes("authority") || m.includes("salik") || m.includes("tasheel") || m.includes("amer")) return "Government & Services";
+      if (m.includes("careem hala") || m.includes("taxi") || m.includes("uber") || m.includes("yango") ||
+          m.includes("dubai metro") || m.includes("rta") || m.includes("nol") || m.includes("salik") || 
+          m.includes("parkin") || m.includes("parking")) return "Transport";
 
-      if (m.includes("enoc") || m.includes("adnoc") || m.includes("eppco") || m.includes("emarat") || m.includes("cafu")) return "Fuel";
+      if (m.includes("dewa") || m.includes("sewa") || m.includes("du ") || m.includes("etisalat") ||
+          m.includes("virgin mobile") || m.includes("empower") || m.includes("emicool") ||
+          m.includes("police") || m.includes("fines") || m.includes("tasheel") || m.includes("amer") || 
+          m.includes("digital dubai") || m.includes("dubai digital") || m.includes("smart dubai") || 
+          m.includes("authority")) return "Government & Utilities";
 
-      if (m.includes("belhasa") || m.includes("driving center") || m.includes("emirates driving")) return "Services & Driving";
+      if (m.includes("enoc") || m.includes("adnoc") || m.includes("eppco") || m.includes("emarat") || 
+          m.includes("cafu")) return "Fuel";
+
+      if (m.includes("belhasa") || m.includes("driving center") || m.includes("emirates driving") || 
+          m.includes("edi")) return "Services & Driving";
 
       if (m.includes("z1 motorsports") || m.includes("motorsport") || m.includes("shanghai global auto") || 
           m.includes("autocare") || m.includes("auto care") || m.includes("car wash") || 
-          m.includes("garage") || m.includes("tyre") || (m.includes("parking") && !m.includes("digital"))) return "Automotive & Tuning";
+          m.includes("garage") || m.includes("tyre")) return "Automotive & Tuning";
 
       if (m.includes("fresh bakes") || m.includes("coffee") || m.includes("cafe") || m.includes("cafeteri") ||
           m.includes("restaurant") || m.includes("restaura") || m.includes("mcdonald") || m.includes("pizza") ||
@@ -459,26 +631,38 @@
           m.includes("changs") || m.includes("lazy cat") || m.includes("grillo") || m.includes("brioche") ||
           m.includes("cheese cake") || m.includes("cheesecake") || m.includes("lounge") || m.includes("culinary") ||
           m.includes("cookie dealer") || m.includes("fusion") || m.includes("bebax") || m.includes("chefs") ||
-          m.includes("daves hot chicken") || m.includes("koukh al shay") || m.includes("kfc") || m.includes("subway")) return "Dining & Cafes";
+          m.includes("daves hot chicken") || m.includes("koukh al shay") || m.includes("kfc") || 
+          m.includes("subway") || m.includes("hardee") || m.includes("jollibee") || m.includes("nando") ||
+          m.includes("bateel") || m.includes("czn") || m.includes("texas roadhouse") || m.includes("shake shack") ||
+          m.includes("five guys") || m.includes("salt ") || m.includes("din tai fung") || m.includes("paul ") ||
+          m.includes("baskin") || m.includes("cold stone")) return "Dining & Cafes";
+
+      if (m.includes("supermarket") || m.includes("grocery") || m.includes("carrefour") || 
+          m.includes("spinneys") || m.includes("lulu") || m.includes("choithrams") || m.includes("waitrose") ||
+          m.includes("fresh day") || m.includes("zahra al lotus") || m.includes("union coop") ||
+          m.includes("nesto") || m.includes("viva ") || m.includes("al maya") || m.includes("baqer mohebi") ||
+          m.includes("day to day") || m.includes("kibsons") || m.includes("barakat") || m.includes("noon grocery") ||
+          m.includes("talabat mart")) return "Groceries";
+
+      if (m.includes("dubai mall") || m.includes("moe") || m.includes("centerpoint") || m.includes("splash") ||
+          m.includes("h&m") || m.includes("zara") || m.includes("ikea") || m.includes("sharaf dg") ||
+          m.includes("jumbo") || m.includes("namshi") || m.includes("ounass") || m.includes("shein") ||
+          m.includes("temu")) return "Shopping";
 
       if (m.includes("tiger strikes") || m.includes("billiards") || m.includes("bowling") || 
           m.includes("que club") || m.includes("cinema") || m.includes("vox") || m.includes("roxy") || 
-          m.includes("reel") || m.includes("topgolf")) return "Entertainment";
+          m.includes("reel") || m.includes("topgolf") || m.includes("global village") || 
+          m.includes("dubai parks") || m.includes("atlantis") || m.includes("wild wadi") || 
+          m.includes("img worlds") || m.includes("platinumlist") || m.includes("ticketmaster")) return "Entertainment";
 
       if (m.includes("hotel") || m.includes("marriott") || m.includes("hilton") || m.includes("hyatt") ||
           m.includes("airbnb") || m.includes("booking.com") || m.includes("agoda") || m.includes("emirates") ||
           m.includes("flydubai") || m.includes("etihad") || m.includes("swiss") || m.includes("norwegian")) return "Travel & Stays";
 
-      if (m.includes("careem hala") || m.includes("taxi") || m.includes("uber") || 
-          m.includes("dubai metro") || m.includes("rta-dubai metro")) return "Transport";
-
-      if (m.includes("supermarket") || m.includes("grocery") || m.includes("carrefour") || 
-          m.includes("spinneys") || m.includes("lulu") || m.includes("choithrams") || m.includes("waitrose") ||
-          m.includes("fresh day") || m.includes("zahra al lotus")) return "Groceries";
-
       if (m.includes("alrabbash") || m.includes("fiddi") || m.includes("hair") || m.includes("salon") || 
           m.includes("barber") || m.includes("pharmacy") || m.includes("aster") || m.includes("life pharmacy") ||
-          m.includes("ibrahem al qurashi") || m.includes("sephora")) return "Personal Care";
+          m.includes("ibrahem al qurashi") || m.includes("sephora") || m.includes("binsina") || 
+          m.includes("boots") || m.includes("thumbay") || m.includes("nmc ") || m.includes("mediclinic")) return "Personal Care";
 
       if (m.includes("fedex") || m.includes("dhl") || m.includes("aramex") || m.includes("ups") || 
           m.includes("courier") || m.includes("master key")) return "Services & Freight";
@@ -489,33 +673,53 @@
       return "Shopping";
     }
 
-    function renderDashboard(txs, month, year, fileCount, cardNames) {
-      document.getElementById('drop-zone').style.display = 'none';
-      document.getElementById('top-bar').style.display = 'flex';
+    // Dynamic Month-over-Month Delta Calculator
+    function calculateMoM(txs) {
+      const monthTotals = {};
+      txs.forEach(t => {
+        // Exclude reimbursable from MoM tracker
+        if(reimbursableFlags[t.txId]) return;
+        const d = t.rawDateObj;
+        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        if(!monthTotals[key]) monthTotals[key] = 0;
+        monthTotals[key] += t.amount;
+      });
       
-      const cardsTitle = cardNames.length > 0 ? cardNames.join(" & ") : "Credit Card";
-      const headerLabelText = fileCount > 1 
-        ? `${cardsTitle} · Consolidated Analysis` 
-        : `${cardsTitle} · Statement Analysis`;
-        
-      document.getElementById('main-header-label').innerText = headerLabelText;
-      document.getElementById('main-header-title').innerText = `${month} ${year} Dashboard`;
+      const sortedKeys = Object.keys(monthTotals).sort(); 
+      if(sortedKeys.length >= 2) {
+        const latest = monthTotals[sortedKeys[sortedKeys.length-1]];
+        const prev = monthTotals[sortedKeys[sortedKeys.length-2]];
+        if(prev === 0) return "";
+        const pct = ((latest - prev) / prev) * 100;
+        const sign = pct > 0 ? "▲" : "▼";
+        const trendClass = pct > 0 ? "trend-up" : "trend-down";
+        return `<div class="trend-badge ${trendClass}">${sign} ${Math.abs(pct).toFixed(1)}% vs prior mo</div>`;
+      }
+      return "";
+    }
 
-      const safeCards = cardsTitle.replace(/[^a-zA-Z0-9]+/g, '_');
-      currentExportFilename = `${safeCards}_${month}_${year}_Dashboard.html`;
-
+    // Core Render Engine
+    function renderDashboardCore(txs) {
       const output = document.getElementById('dashboard-output');
-      output.style.display = 'block';
-
+      
       if (txs.length === 0) {
-        output.innerHTML = "<div style='text-align:center; padding: 30px 0; color: #94A3B8;'>No transactions detected across the selected PDF(s).</div>";
+        output.innerHTML = "<div style='text-align:center; padding: 30px 0; color: #94A3B8;'>No transactions match your search.</div>";
         return;
       }
 
       let totalSpend = 0, usualTotal = 0, oneTimeTotal = 0, usualCount = 0, oneTimeCount = 0;
+      let reimbursableTotal = 0;
       let catData = {};
+      let reimbursableItems = [];
 
       txs.forEach(t => {
+        // Check Flag Status
+        if (reimbursableFlags[t.txId]) {
+          reimbursableTotal += t.amount;
+          reimbursableItems.push(t);
+          return; // Skip normal categories
+        }
+
         totalSpend += t.amount;
         if (oneTimeCategories.includes(t.category)) {
           oneTimeTotal += t.amount;
@@ -530,34 +734,60 @@
         catData[t.category].items.push(t);
       });
 
-      let usualPct = ((usualTotal / totalSpend) * 100).toFixed(1);
-      let oneTimePct = ((oneTimeTotal / totalSpend) * 100).toFixed(1);
-      
+      let usualPct = totalSpend > 0 ? ((usualTotal / totalSpend) * 100).toFixed(1) : 0;
+      let oneTimePct = totalSpend > 0 ? ((oneTimeTotal / totalSpend) * 100).toFixed(1) : 0;
       let uniqueDays = [...new Set(txs.map(t => t.date))].length;
       let dailyAvg = uniqueDays > 0 ? Math.round(totalSpend / uniqueDays) : Math.round(totalSpend / 30);
-
       let sortedCats = Object.entries(catData).sort((a, b) => b[1].total - a[1].total);
       
-      const cardBoxTitle = fileCount > 1 ? "Consolidated Outflows" : "Statement Outflows";
-      const cardBoxSub = fileCount > 1 
-        ? `Parsed across ${fileCount} statements (${cardsTitle})` 
+      const cardsTitle = globalCardNames.length > 0 ? globalCardNames.join(" & ") : "Credit Card";
+      const cardBoxTitle = globalFileCount > 1 ? "Consolidated Outflows" : "Statement Outflows";
+      
+      const searchTerm = document.getElementById('search-input').value;
+      let cardBoxSub = globalFileCount > 1 
+        ? `Parsed across ${globalFileCount} statements (${cardsTitle})` 
         : `${cardsTitle} · Parsed from PDF`;
+      if(searchTerm) cardBoxSub = `Showing search results for "${searchTerm}"`;
+
+      const trendHtml = calculateMoM(txs);
+
+      // Generate CSS Donut Chart logic
+      let conicStops = [];
+      let currentDeg = 0;
+      if (totalSpend > 0) {
+        sortedCats.forEach(([cName, cObj]) => {
+          const meta = categoryMeta[cName] || { color: "#A855F7" };
+          const pct = (cObj.total / totalSpend) * 100;
+          const deg = (pct / 100) * 360;
+          conicStops.push(`${meta.color} ${currentDeg}deg ${currentDeg + deg}deg`);
+          currentDeg += deg;
+        });
+      } else {
+        conicStops.push(`#1e293b 0deg 360deg`);
+      }
+      const conicGradient = `conic-gradient(${conicStops.join(', ')})`;
 
       let html = `
         <div class="main-card">
-          <div class="card-title">${cardBoxTitle}</div>
-          <div class="card-subtitle">${cardBoxSub}</div>
-          <div class="card-total">AED ${totalSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-          <div class="progress-bar">
-      `;
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <div class="card-title">${cardBoxTitle}</div>
+              <div class="card-subtitle">${cardBoxSub}</div>
+            </div>
+            ${trendHtml}
+          </div>
 
-      sortedCats.forEach(([cName, cObj]) => {
-        const meta = categoryMeta[cName] || { color: "#A855F7" };
-        const pct = ((cObj.total / totalSpend) * 100).toFixed(1);
-        html += `<div style="width: ${pct}%; background: ${meta.color};" title="${cName}: ${pct}%"></div>`;
-      });
-      
-      html += `</div></div>
+          <div class="donut-container">
+            <div class="donut-chart" style="background: ${conicGradient};"></div>
+            <div class="donut-inner">
+               <div class="donut-lbl">Net Spend</div>
+               <div class="donut-val">AED ${totalSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+            </div>
+          </div>
+          
+          ${reimbursableTotal > 0 ? `<div style="text-align:center; font-size:11px; color:#60A5FA; font-weight:700; margin-bottom: 20px;">+ AED ${reimbursableTotal.toLocaleString('en-US', {minimumFractionDigits: 2})} flagged as Corporate/Reimbursable</div>` : ''}
+        </div>
+        
         <div class="split-grid">
           <div class="split-card recurring">
             <div class="split-label">Usual Spends</div>
@@ -577,7 +807,7 @@
             <div class="stat-lbl">Daily Avg</div>
           </div>
           <div class="stat-card">
-            <div class="stat-num">${txs.length}</div>
+            <div class="stat-num">${totalSpend > 0 ? txs.length - reimbursableItems.length : 0}</div>
             <div class="stat-lbl">Txn Count</div>
           </div>
           <div class="stat-card">
@@ -587,36 +817,63 @@
             <div class="stat-lbl">Top: ${sortedCats[0] ? sortedCats[0][0].split(' ')[0] : 'N/A'}</div>
           </div>
         </div>
-
-        <div class="header-label" style="margin-bottom: 12px;">Tap any category to inspect transactions</div>
       `;
 
-      sortedCats.forEach(([cName, cObj]) => {
-        const meta = categoryMeta[cName] || { icon: "🧾", color: "#A855F7" };
-        const pct = ((cObj.total / totalSpend) * 100).toFixed(1);
+      if(!searchTerm) {
+        html += `<div class="header-label" style="margin-bottom: 12px; display:flex; justify-content:space-between;">
+          <span>Tap category to inspect</span>
+          <span>Tap 💼 to flag reimbursable</span>
+        </div>`;
+      }
+
+      // Helper function to render a detail block
+      const renderCategoryBlock = (cName, cTotal, itemsArray, metaOverrides = null, defaultOpen = false) => {
+        const meta = metaOverrides || categoryMeta[cName] || { icon: "🧾", color: "#A855F7" };
+        const pct = totalSpend > 0 && !metaOverrides ? ((cTotal / totalSpend) * 100).toFixed(1) : 0;
+        const pctDisplay = metaOverrides ? "---" : `${pct}%`;
         
         let itemsHtml = "";
-        cObj.items.sort((a, b) => b.amount - a.amount).forEach(item => {
-          const cardTag = fileCount > 1 ? ` · ${item.card.replace(' Card', '')}` : '';
+        itemsArray.sort((a, b) => b.amount - a.amount).forEach(item => {
+          const cardTag = globalFileCount > 1 ? ` · ${item.card.replace(' Card', '')}` : '';
+          const isFlagged = reimbursableFlags[item.txId] ? 'flagged' : '';
+          const rowClass = isFlagged ? 'is-flagged' : '';
+          
           itemsHtml += `
-            <div class="merchant-item">
-              <div class="m-left"><div class="merchant-dot"></div><span class="m-name">${item.merchant}</span><span class="m-date">${item.date}${cardTag}</span></div>
+            <div class="merchant-item ${rowClass}">
+              <div class="m-left">
+                <div class="flag-btn ${isFlagged}" onclick="toggleFlag('${item.txId}')">💼</div>
+                <div style="display:flex; flex-direction:column;">
+                  <span class="m-name" onclick="renameMerchant(this)">${item.merchant}</span>
+                  <span class="m-date">${item.date}${cardTag}</span>
+                </div>
+              </div>
               <div class="m-amt">AED ${item.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
             </div>`;
         });
 
-        html += `
-          <details style="--cat-color: ${meta.color};">
+        return `
+          <details style="--cat-color: ${meta.color};" ${searchTerm || defaultOpen ? 'open' : ''}>
             <summary>
-              <div class="cat-left"><span class="cat-icon">${meta.icon}</span><div><div class="cat-name">${cName}</div><div class="cat-count">${cObj.items.length} tx</div></div></div>
-              <div class="cat-right"><div class="cat-amount">AED ${cObj.total.toLocaleString('en-US', {minimumFractionDigits: 2})}</div><div class="cat-pct">${pct}%</div></div>
+              <div class="cat-left"><span class="cat-icon">${meta.icon}</span><div><div class="cat-name">${cName}</div><div class="cat-count">${itemsArray.length} tx</div></div></div>
+              <div class="cat-right"><div class="cat-amount">AED ${cTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}</div><div class="cat-pct" style="color:${metaOverrides ? '#94A3B8' : ''}">${pctDisplay}</div></div>
             </summary>
-            <div class="cat-bar-bg"><div class="cat-bar-fill" style="width: ${pct}%;"></div></div>
+            ${!metaOverrides ? `<div class="cat-bar-bg"><div class="cat-bar-fill" style="width: ${pct}%;"></div></div>` : ''}
             <div class="details-wrapper"><div class="merchants-list">${itemsHtml}</div></div>
           </details>`;
+      };
+
+      // Standard Categories
+      sortedCats.forEach(([cName, cObj]) => {
+        html += renderCategoryBlock(cName, cObj.total, cObj.items);
       });
 
-      html += `<div class="footer">${cardsTitle} · ${month} ${year} · ${APP_VERSION}</div>`;
+      // Special Reimbursable Block at the bottom
+      if (reimbursableItems.length > 0) {
+        html += `<div style="margin-top:20px;"></div>`; 
+        html += renderCategoryBlock("Reimbursable & Corporate", reimbursableTotal, reimbursableItems, categoryMeta["Reimbursable"]);
+      }
+
+      html += `<div class="footer" style="margin-top:28px;">${cardsTitle} · ${globalMonth} ${globalYear} · ${APP_VERSION}</div>`;
       output.innerHTML = html;
     }
   </script>
