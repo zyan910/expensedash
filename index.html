@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <link rel="manifest" href="manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15,8 +15,15 @@
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     * { box-sizing: border-box; }
 
+    html { background-color: #000000; }
+    
     body {
-      margin: 0; padding: 24px 16px 48px; font-family: 'Inter', -apple-system, sans-serif;
+      margin: 0; 
+      /* Dynamically adds padding for iPhone notch, defaults to normal on PC */
+      padding: calc(24px + env(safe-area-inset-top)) 16px calc(48px + env(safe-area-inset-bottom)); 
+      font-family: 'Inter', -apple-system, sans-serif;
+      min-height: 100vh;
+      min-height: 100dvh;
       background: radial-gradient(ellipse 120% 280px at 50% 0px, rgba(145, 28, 52, 0.55) 0%, rgba(145, 28, 52, 0.15) 55%, transparent 100%), #000000;
       background-attachment: fixed; color: #F1F5F9; -webkit-font-smoothing: antialiased;
       overflow-x: hidden;
